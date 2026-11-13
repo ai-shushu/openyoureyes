@@ -50,7 +50,7 @@ CERT_DIR = os.path.abspath(os.environ.get("T9_CERT_DIR") or os.path.join(os.path
 # 检查电脑端新版本：发布地址上放一个 latest.json（dev/build_app.py 会生成），内容如 {"version": "0.8.0", "page": "下载页", "notes": "一句话说明"}
 # 每 12 小时取一次，只发出版本号，不带任何用户数据；设环境变量 T9_UPDATE_FEED= （空）可关闭
 UPDATE_FEED = os.environ.get("T9_UPDATE_FEED", "https://github.com/ai-shushu/openyoureyes/releases/latest/download/latest.json")
-VERSION = "0.7.4"   # 唯一的版本号：插件、桌面版扩展、安卓 App 打包时都从这里同步
+VERSION = "0.7.5"   # 唯一的版本号：插件、桌面版扩展、安卓 App 打包时都从这里同步
 
 # 最近事件（手机报错、拒收、网络变化等），设置页「诊断」里用大白话列出来
 _events = collections.deque(maxlen=80)

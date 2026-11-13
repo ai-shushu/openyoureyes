@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "open-your-eyes",
   "display_name": "Open Your Eyes",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "把闲置手机当作 Claude 的眼睛：需要时让工作台上的手机拍照，全部在本机与局域网内完成。",
   "long_description": "需要先在电脑上安装并打开 Open Your Eyes 程序，手机扫码加入后即可使用。每次拍照都要你在 Claude 里允许；照片不经过任何云服务。",
   "icon": "icon.png",

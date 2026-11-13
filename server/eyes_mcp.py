@@ -352,7 +352,7 @@ HANDLERS = {"look": tool_look, "zoom": tool_zoom, "look_clip": tool_look_clip, "
 
 
 # ---------------- MCP（JSON-RPC 2.0）：电脑端程序的 /mcp 直接调用 respond；也可按行走 stdio（开发用） ----------------
-VERSION = "0.7.4"   # 与 serve.py 一致（测试会检查）
+VERSION = "0.7.5"   # 与 serve.py 一致（测试会检查）
 
 
 def respond(msg, state=None):
