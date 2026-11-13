@@ -1,0 +1,749 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<title>Open Your Eyes 设置</title>
+<style>
+:root { color-scheme: light; --bg:#f7f6f3; --fg:#1f1e1c; --mut:#6f6b64; --card:#ffffff; --line:#e7e4de; --acc:#2563eb;
+  --ink:#1f1e1c; --ok:#1d8a4e; --warn:#b26b00; --bad:#c9372c; --soft:#f2f0eb; --body:#2b2b2b; --bezel:#111111; }
+* { box-sizing: border-box; }
+html, body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 -apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; }
+main { max-width:1240px; margin:0 auto; padding:12px 16px 16px; }
+header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+h1 { font-size:18px; margin:0; }
+#top { color:var(--mut); font-size:13px; }
+.sp { flex:1; }
+.switch { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--mut); cursor:pointer; user-select:none; }
+.switch i { width:34px; height:20px; border-radius:10px; background:var(--line); position:relative; transition:background .15s; }
+.switch i::after { content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .15s; }
+.switch.on i { background:var(--ok); } .switch.on i::after { left:16px; }
+
+header.top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 12px; }
+.brand { font-size:15px; font-weight:650; display:flex; align-items:center; gap:7px; }
+.brand .ver { font-size:12px; font-weight:400; color:var(--mut); margin-left:2px; }
+.upd { color:var(--warn); }
+.brand .logo { width:24px; height:24px; display:block; }
+.runpill { font-size:12.5px; color:var(--mut); }
+.grid { display:grid; grid-template-columns: 1fr 300px; gap:12px; align-items:start; }
+@media (max-width:900px) { .grid { grid-template-columns: 1fr; } }
+.col { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; box-shadow:0 1px 2px rgba(31,30,28,.04); }
+.card h2 { font-size:13.5px; font-weight:600; margin:0 0 6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.sub { color:var(--mut); font-size:12px; margin:0 0 10px; }
+select, input[type=text] { font:inherit; font-size:13px; padding:4px 7px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+a.b { text-decoration:none; display:inline-block; }
+button.b, a.b { font:inherit; font-size:12.5px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--soft); color:var(--fg); cursor:pointer; white-space:nowrap; }
+button.b.primary { background:var(--ink); border-color:var(--ink); color:#fff; }
+button.b:hover, a.b:hover { filter:brightness(.97); }
+button.b.on { background:var(--warn); border-color:var(--warn); color:#111; }
+button.b.danger { color:var(--bad); }
+.ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .mut { color:var(--mut); }
+
+/* ---------- 机位墙：一台台模拟手机 ---------- */
+.wall { display:flex; flex-wrap:wrap; gap:14px 12px; padding:4px 2px 2px; }
+.ph { width:122px; display:flex; flex-direction:column; align-items:center; gap:8px; transition:width .2s; }
+.ph.big { width:240px; }
+.ph.pend .frame { box-shadow:0 0 0 2px var(--warn); }
+.frame { width:100%; aspect-ratio: 9 / 19; border-radius:20px; background:var(--body); padding:5px; position:relative;
+  box-shadow: 0 10px 24px rgba(0,0,0,.22), inset 0 0 0 1.5px rgba(255,255,255,.12); }
+.ph.big .frame { border-radius:40px; padding:9px; }
+.frame::before { content:""; position:absolute; right:-3px; top:22%; width:3px; height:12%; border-radius:0 2px 2px 0; background:var(--body); }
+.screen { position:relative; width:100%; height:100%; border-radius:16px; overflow:hidden; background:var(--bezel); cursor:default; }
+.ph.big .screen { border-radius:32px; }
+.screen .island { position:absolute; left:50%; top:6px; transform:translateX(-50%); width:30%; height:12px; border-radius:7px; background:#000; z-index:4; }
+.screen img.last { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:.92; display:none; }
+.screen video { position:absolute; left:50%; top:50%; width:100%; height:100%; object-fit:cover; transform:translate(-50%,-50%); display:none; }
+.screen.off img.last { filter:grayscale(1) brightness(.55); }
+.screen.live video { display:block; }
+.screen img.mj { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; z-index:1; }
+.screen.live.app img.mj { display:block; } .screen.live.app video { display:none; } .screen.live img.last { display:none !important; }
+.screen.live { cursor:zoom-in; } .ph.big .screen.live { cursor:zoom-out; }
+.screen .g3 { position:absolute; inset:0; pointer-events:none; display:none;
+  background:linear-gradient(to right, transparent 33.1%, rgba(255,255,255,.3) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.3) 66.7%, transparent 66.9%),
+             linear-gradient(to bottom, transparent 33.1%, rgba(255,255,255,.3) 33.3%, transparent 33.5%, transparent 66.5%, rgba(255,255,255,.3) 66.7%, transparent 66.9%); }
+.screen.live .g3 { display:block; }
+.sbar { position:absolute; left:0; right:0; top:22px; z-index:3; display:flex; justify-content:center; gap:5px; align-items:center;
+  font-size:11px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.8); padding:0 10px; }
+.sbar .dt { width:7px; height:7px; border-radius:50%; background:#6b7684; flex:none; }
+.dt.ok { background:var(--ok); } .dt.warn { background:var(--warn); } .dt.bad { background:var(--bad); }
+.blank { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  color:#8b97a5; font-size:12px; text-align:center; padding:16px; }
+.screen.live .blank, .screen.has .blank { display:none; }
+.screen .tag.warn { background:rgba(201,55,44,.9); }
+.screen .tag { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; bottom:34px; z-index:3; font-size:10.5px; color:#fff; background:rgba(0,0,0,.5); padding:1px 6px; border-radius:6px; }
+.screen.live .tag { display:none; }
+.screen .lv { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; bottom:34px; z-index:3; font-size:10.5px; color:#fff; background:rgba(214,53,28,.85); padding:1px 6px; border-radius:6px; display:none; }
+.screen.live .lv { display:block; }
+.meta { width:100%; text-align:center; }
+.meta .b { font-size:11.5px; padding:3px 9px; }
+.nm { font-size:12.5px; font-weight:600; cursor:text; display:inline-flex; align-items:center; gap:4px; max-width:100%; border-radius:6px; padding:1px 6px; }
+.nm:hover { background:var(--soft); }
+.nm .t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.nm .star { color:#d29a0b; font-size:11px; }
+.nm .pen { color:var(--mut); font-size:11px; opacity:0; }
+.ph:hover .nm .pen { opacity:1; }
+.nmedit { width:100%; text-align:center; font-weight:600; font-size:12.5px; padding:2px 6px; }
+.screen .ctl { position:absolute; left:0; right:0; bottom:7px; z-index:5; display:flex; justify-content:center; gap:4px; }
+.ctl button { font:inherit; font-size:11px; line-height:1; color:#fff; background:rgba(0,0,0,.55); border:0; border-radius:12px; padding:5px 9px; cursor:pointer; }
+.ctl button:hover { background:rgba(0,0,0,.82); }
+.ctl button.stop { background:rgba(201,55,44,.9); }
+/* 取景 / ⋯ 平时收起，鼠标移到这台手机上才出现（触屏设备一直显示；取景中、菜单打开时也一直显示） */
+@media (hover:hover) {
+  .screen .ctl { opacity:0; transition:opacity .15s; }
+  .ph:hover .screen .ctl, .ph.live .screen .ctl, .ph.menu .screen .ctl, .ph:focus-within .screen .ctl { opacity:1; }
+}
+.nm .badge { font-size:10px; font-weight:600; color:#b26a00; background:#fff3df; border:1px solid #f3d9a8; border-radius:8px; padding:0 5px; cursor:help; }
+.ph.offl .nm { color:var(--mut); }
+#phMenu .mi { cursor:default; color:var(--mut); font-size:11.5px; line-height:1.5; padding:6px 10px 7px; border-bottom:1px solid var(--line); margin-bottom:3px; border-radius:0; }
+#phMenu .mi:hover { background:none; }
+#phMenu .mi b { color:var(--ink); font-weight:600; }
+#phMenu { position:fixed; z-index:50; display:none; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(31,30,28,.14); padding:4px; min-width:140px; font-size:12.5px; }
+#phMenu.on { display:block; }
+#phMenu div { padding:7px 10px; border-radius:6px; cursor:pointer; }
+#phMenu div:hover { background:var(--soft); }
+#phMenu .danger { color:var(--bad); }
+.meta .info { color:var(--mut); font-size:11px; margin:2px 0 0; line-height:1.35; display:none; }
+.ph.big .meta .info { display:block; }   /* 放大时空间够，设备信息直接写出来 */
+.meta .acts { margin-top:4px; }
+.meta .acts { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; }
+
+/* 添加机位：虚线手机，屏幕里放一个二维码（教程页会自动判断新手机还是连过的手机） */
+.ph.add .frame { background:transparent; box-shadow:none; border:2px dashed var(--line); }
+.ph.add .frame::before { display:none; }
+.ph.add .screen { background:transparent; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:10px; }
+.ph.add .plus { font-size:13px; color:var(--acc); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px; background:none; border:0; font-family:inherit; }
+.ph.add .plus span { font-size:40px; line-height:1; font-weight:300; }
+.ph.add.open { width:210px; }
+.ph.add .qtitle { font-size:13px; font-weight:600; margin-bottom:6px; }
+.ph.add img.qr { width:88%; aspect-ratio:1; background:#fff; border-radius:8px; padding:5px; }
+.ph.add .qrurl { font-size:10px; color:var(--mut); word-break:break-all; margin:4px 0; }
+.ph.add ol { text-align:left; font-size:11px; color:var(--mut); margin:2px 0 0; padding-left:16px; }
+.waitline { margin-top:6px; font-size:11.5px; color:var(--mut); }
+.waitline.ok { color:var(--ok); font-weight:600; }
+
+.lvpill { display:none; align-items:center; gap:8px; font-size:12px; font-weight:400; color:var(--mut); }
+.lvpill.on { display:inline-flex; }
+.lvpill.on + #liveAll { display:none; }
+.lvpill .cd { color:#d6351c; font-variant-numeric:tabular-nums; font-weight:600; }
+.lvpill a { color:var(--acc); cursor:pointer; }
+.sub b { color:var(--fg, inherit); font-weight:600; }
+
+.guide { display:none; margin:0 0 12px; }
+.guide.on { display:block; }
+.guide h2 { margin:0 0 8px; font-size:15px; }
+.guide ol { list-style:none; margin:0; padding:0; display:flex; gap:10px; flex-wrap:wrap; }
+.guide li { flex:1 1 200px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 12px; font-size:12px; color:var(--mut); }
+.guide li b { display:block; color:var(--fg); font-size:13.5px; margin-bottom:2px; }
+.guide li.done { border-color:var(--ok); }
+.guide li.done b::before { content:"✓ "; color:var(--ok); }
+.guide li.now { border:2px solid var(--acc); }
+.guide li[data-go] { cursor:pointer; }
+.ai code { font-size:11.5px; background:var(--soft); border-radius:6px; padding:5px 8px; display:block; word-break:break-all; flex:1 1 100%; }
+.card.ai { padding:0; overflow:hidden; }
+.aihead { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); font-size:13.5px; font-weight:600; }
+.aihead .mut { font-size:12px; font-weight:400; }
+.airow { display:flex; align-items:center; gap:12px; padding:11px 14px; border-bottom:1px solid var(--line); }
+.airow .ic { width:32px; height:32px; border-radius:8px; display:grid; place-items:center; font-size:12px; font-weight:600; flex:none; background:#f1efe8; color:#444441; }
+.airow .ic.claude { background:#faece7; color:#993c1d; }
+.airow .nm2 { flex:1; min-width:0; }
+.airow .nm2 b { display:block; font-size:13px; font-weight:600; }
+.airow .nm2 small { display:block; font-size:11.5px; color:var(--mut); margin-top:1px; }
+.airow .b { height:28px; }
+.ready { display:inline-flex; align-items:center; gap:6px; color:var(--ok); font-size:12.5px; font-weight:500; white-space:nowrap; }
+.ready::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--ok); }
+.airow.empty { color:var(--mut); font-size:12.5px; }
+.notice { display:none; gap:8px; padding:10px 14px; background:#eef4ff; color:#1e4fa8; font-size:12.5px; line-height:1.6; border-bottom:1px solid var(--line); }
+.notice.on { display:flex; }
+.notice .i { flex:none; width:16px; height:16px; border-radius:50%; border:1.5px solid currentColor; display:grid; place-items:center; font-size:10px; font-weight:700; margin-top:2px; }
+.kw { padding:10px 14px; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--mut); }
+.kw b { color:var(--fg); }
+.aifoot summary { list-style:none; display:flex; align-items:center; justify-content:space-between; padding:10px 14px; font-size:12px; color:var(--mut); cursor:pointer; }
+.aifoot summary::-webkit-details-marker { display:none; }
+.aifoot[open] .chev { transform:rotate(180deg); }
+.aifootbody { padding:0 14px 12px; font-size:12px; color:var(--mut); line-height:1.8; }
+.aifootbody code { font-size:11.5px; background:var(--soft); border-radius:5px; padding:1px 6px; }
+.alerts { display:none; margin:0 0 12px; }
+.alerts.on { display:block; }
+.alerts div { background:#fff4e0; color:#6b4100; border:1px solid #f0c78a; border-radius:10px; padding:10px 14px; margin-bottom:8px; font-size:13.5px; line-height:1.6; }
+.alerts b { color:#8a3c00; }
+.alerts div.upd-bar { background:#eef5ff; color:#1d3b66; border-color:#c9dcf7; }
+.alerts .upd-bar b { color:#1d3b66; } .alerts .upd-bar a { color:var(--acc); font-weight:600; } .alerts .upd-bar .mut { color:#5c6f8a; font-size:12px; }
+
+.kv { display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; font-size:13px; }
+.kv > span:nth-child(odd) { color:var(--mut); }
+.ell { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.checks div { margin:2px 0; }
+.events { font-size:11.5px; color:var(--mut); max-height:150px; overflow:auto; background:var(--soft); border-radius:6px; padding:6px 8px; margin-top:8px; }
+.events div { word-break:break-all; }
+#toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:#14181d; color:#fff; padding:8px 14px; border-radius:8px; font-size:13px; display:none; z-index:20; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="brand"><img class="logo" src="/icon.svg" alt="Open Your Eyes"></div>
+    <span class="runpill" id="top">读取中…</span>
+    <span class="sp"></span>
+    <label class="switch" id="autoSw" title="登录电脑后自动在后台运行"><i></i><span>开机自动启动</span><span id="autoTxt" style="display:none"></span></label>
+  </header>
+
+  <div class="alerts" id="alerts"></div>
+  <div class="guide" id="guide">
+    <ol>
+      <li id="g1"><b>① 连接 AI</b>右侧「连接 AI」点「一键安装」</li>
+      <li id="g2"><b>② 添加手机</b>点「＋ 添加机位」，用手机扫码</li>
+      <li id="g3"><b>③ 让 AI 看一眼</b>新开对话，说「睁眼，看看桌上的东西」</li>
+    </ol>
+  </div>
+
+  <div class="grid">
+    <!-- 左：机位 -->
+    <section class="card">
+      <h2>机位 <span class="sp"></span>
+        <span class="mut" style="font-weight:400;font-size:12px">AI 拍照时用</span><select id="defPhone"></select>
+        <span class="lvpill" id="liveWarn"><span class="cd" id="liveCd"></span><a id="liveMore">再开 3 分钟</a><a id="liveStopAll">全部结束</a></span>
+        <button class="b" id="coverAll" title="让每台在线手机马上截一张当前画面，用来检查手机是否正常">刷新画面</button>
+        <button class="b" id="liveAll" title="同时看所有在线机位的画面，用来摆放手机、确定拍摄角度">全部实时取景</button></h2>
+      <p class="sub">画面每分钟更新一次；「实时取景」用于确定拍摄角度，3 分钟后自动关闭。</p>
+      <div class="wall" id="wall">
+        <div class="ph add" id="addSlot">
+          <div class="frame"><div class="screen" id="addScreen"></div></div>
+          <div class="meta"><div class="info">扫码就能用</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右：连接 AI / 照片与隐私 / 诊断 -->
+    <div class="col">
+      <section class="card ai" id="aiCard">
+        <div class="aihead"><span>连接 AI</span><span class="mut" id="aiCount"></span></div>
+        <div id="aiRows"></div>
+        <div class="notice" id="aiNotice"></div>
+        <div class="kw">关键词：对 AI 说「<b>睁眼</b>」，比如「睁眼看看这块板子」，它就会用手机拍照。</div>
+        <details class="aifoot"><summary><span>手动设置与其它 AI</span><span class="chev">⌄</span></summary>
+          <div class="aifootbody">
+            <div id="aiMissing"></div>
+            <div>其它支持 MCP 的 AI，填这个地址：<code id="aiUrl"></code></div>
+            <div>Claude 桌面版扩展文件：<a id="aiExt" href="/app/open-your-eyes.mcpb" download="OpenYourEyes.mcpb">下载</a></div>
+          </div>
+        </details>
+      </section>
+      <section class="card">
+        <h2>照片与隐私</h2>
+        <div class="kv">
+          <span>存放位置</span><span class="ell" id="photoDir"></span>
+          <span>已占用</span><span id="photoUse"></span>
+          <span>自动清理</span><span><select id="retention"><option value="7">保留 7 天</option><option value="30">保留 30 天</option>
+            <option value="90">保留 90 天</option><option value="0">一直保留</option></select>
+            <button class="b danger" id="clearAll" style="margin-left:4px">清空</button></span>
+        </div>
+        <p class="sub" style="margin:6px 0 0">照片只存在这台电脑上，不上传任何服务器。</p>
+      </section>
+
+      <section class="card">
+        <h2>诊断 <span class="sp"></span><a class="b" id="diagZip" href="/api/diagnostics.zip" download title="打包运行记录（不含照片），出问题时发给开发者">导出</a>
+          <button class="b" id="repair" title="重新生成电脑的连接证书并重启手机连接">一键修复</button></h2>
+        <div class="checks" id="checks"></div>
+        <div class="kv" style="margin-top:6px">
+          <span>电脑地址</span><span id="infoIp"></span>
+          <span>版本</span><span id="infoVer"></span>
+          <span id="ipLabel" style="display:none">手机连电脑用</span><span id="ipRow" style="display:none"><select id="lanIp"></select></span>
+        </div>
+        <details class="aiMore"><summary>最近事件</summary><div class="events" id="events"></div></details>
+      </section>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<div id="phMenu"></div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var S = null;
+  function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function toast(t) { var x = $("toast"); x.textContent = t; x.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(function () { x.style.display = "none"; }, 2200); }
+  function size(b) { return b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.round(b / 1e3) + " KB"; }
+  function ago(s) { return s == null ? "" : s < 60 ? Math.round(s) + " 秒前" : s < 3600 ? Math.round(s / 60) + " 分钟前" : s < 86400 ? Math.round(s / 3600) + " 小时前" : Math.round(s / 86400) + " 天前"; }
+  function photoTime(f) { var m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/.exec(f || ""); return m ? m[2] + "-" + m[3] + " " + m[4] + ":" + m[5] : ""; }
+
+  async function api(path, body) {
+    var r = await fetch(path, body === undefined ? { cache: "no-store" } :
+      { method: "POST", headers: { "Content-Type": "application/json", "X-T9": "1" }, body: JSON.stringify(body) });
+    var j = await r.json();
+    if (!j.ok) throw new Error(j.error || r.status);
+    return j;
+  }
+  async function act(path, body, okText) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    try { S = await api(path, body); render(); if (okText) toast(okText); }
+    catch (e) { toast("没成功：" + e.message); }
+  }
+
+  // =================== 一台台模拟手机 ===================
+  var cards = {};   // phoneId -> DOM
+  function hm(ts) {
+    var d = new Date(ts * 1000), n = new Date(), z = function (v) { return ("0" + v).slice(-2); };
+    return (d.toDateString() === n.toDateString() ? "" : (d.getMonth() + 1) + "/" + d.getDate() + " ") + z(d.getHours()) + ":" + z(d.getMinutes());
+  }
+  function makeCard(p) {
+    var d = document.createElement("div");
+    d.className = "ph"; d.dataset.id = p.id;
+    d.innerHTML =
+      "<div class='frame'><div class='screen'><div class='island'></div>" +
+        "<img class='last' alt=''><video autoplay muted playsinline></video><div class='g3'></div>" +
+        "<div class='sbar'><span class='dt'></span><span class='st'></span></div>" +
+        "<div class='blank'><div class='bt'></div></div>" +
+        "<span class='tag'></span><span class='lv'>● 实时取景中</span><div class='ctl'></div></div></div>" +
+      "<div class='meta'><span class='nm' title='点一下改名'><span class='t'></span><span class='star' title='默认机位'>★</span><span class='pen'>✎</span></span><span class='badge' style='display:none' title='在手机上打开 App，点「电脑上有新版本」更新'>可更新</span>" +
+        "<div class='info'></div><div class='acts'></div></div>";
+    var v = d.querySelector("video");
+    v.addEventListener("loadedmetadata", function () { fitVideo(v); });
+    v.addEventListener("resize", function () { fitVideo(v); });
+    d.querySelector(".screen").addEventListener("click", function (e) { if (!e.target.closest(".ctl") && views[p.id]) zoom(p.id); });
+    d.querySelector(".nm").addEventListener("click", function () { startRename(d, p.id); });
+    d.addEventListener("click", function (e) {
+      var a = e.target.dataset && e.target.dataset.a; if (!a) return;
+      if (a === "live") { if (views[p.id]) viewStop(p.id); else liveOpen([p.id]); }
+      if (a === "menu") { e.stopPropagation(); openMenu(e.target, p.id); }
+      if (a === "approve") act("/api/phones/approve", { id: p.id }, "已允许");
+      if (a === "deny") act("/api/phones/remove", { id: p.id }, "已拒绝");
+    });
+    $("wall").insertBefore(d, $("addSlot"));
+    return d;
+  }
+  function updateCard(d, p, s) {
+    d.dataset.name = p.name;
+    if (d.querySelector(".nm .t").textContent !== p.name) d.querySelector(".nm .t").textContent = p.name;
+    d.querySelector(".nm .star").style.display = s.prefs.defaultPhone === p.id ? "" : "none";
+    var dot = "", txt = "";
+    if (p.pending) { dot = "warn"; txt = "等你允许"; }
+    else if (!p.online) { txt = "离线" + (p.lastSeenAgoS != null ? " · " + ago(p.lastSeenAgoS) : ""); }
+    else if (p.state === "hidden") { dot = "warn"; txt = "拍照页在后台"; }
+    else if (p.state === "camera") { dot = "warn"; txt = "摄像头启动中"; }
+    else if (p.state === "busy") { dot = "ok"; txt = "正在拍照"; }
+    else { dot = "ok"; txt = "待命"; }
+    d.querySelector(".dt").className = "dt " + dot;
+    d.querySelector(".st").textContent = txt;
+    var scr = d.querySelector(".screen"), img = d.querySelector("img.last"), tag = d.querySelector(".tag");
+    scr.classList.toggle("off", !p.online);
+    if (p.cover || p.lastPhoto) {   // 优先显示封面（手机放稳时自动截的小图），没有封面才用最近拍的照片
+      var src = p.cover ? "/cover/" + encodeURIComponent(p.id) + "?t=" + p.cover : "/photo/" + p.lastPhoto;
+      if (img.dataset.src !== src) { img.dataset.src = src; img.src = src; }
+      img.style.display = "block"; scr.classList.add("has");
+      // 画面时间平时不显示（在线时每分钟自动更新）；只有离线、画面过旧、只有旧照片时才标出来
+      var stale = p.cover && Date.now() / 1000 - p.cover > 180;
+      tag.textContent = !p.cover ? "最近一张 · " + photoTime(p.lastPhoto) : !p.online ? "离线前 · " + hm(p.cover) : "画面 · " + hm(p.cover);
+      tag.style.display = !p.cover || !p.online || stale ? "" : "none";
+    } else {
+      img.style.display = "none"; scr.classList.remove("has"); tag.style.display = "none";
+    }
+    // 「刷新画面」之后：这台手机在规定时间内交回了新画面就恢复正常显示，没交回就标出来
+    var rf = refreshing && refreshing.before.hasOwnProperty(p.id) ? refreshing : null;
+    tag.classList.remove("warn");
+    if (rf && (p.cover || 0) === rf.before[p.id]) {
+      tag.style.display = "";
+      if (Date.now() - rf.at < 12000) tag.textContent = "更新中…";
+      else { tag.textContent = "没有响应"; tag.classList.add("warn"); }
+    }
+    d.querySelector(".bt").textContent = p.pending ? "新手机请求加入" : !p.online ? "" : p.state === "hidden" ? "拍照页在后台：把它切回前台" : "还没拍过照片";
+    var cam = p.facing ? (p.facing === "user" ? "前置" : "后置") + (p.torch ? " · 有补光灯" : "") : "";
+    var kind = [p.model || p.device || "", p.app ? "App " + (p.appVersion || "") : "网页"].filter(Boolean).join(" · ").trim();
+    var info = [kind, cam].filter(Boolean).join(" · ");
+    var old = p.app && p.appVersion && s.appLatest && verLess(p.appVersion, s.appLatest);
+    d.dataset.kind = kind; d.dataset.cam = cam;   // 「⋯」菜单顶部显示这些设备信息
+    var bg = d.querySelector(".nm + .badge") || d.querySelector(".badge");
+    bg.style.display = old ? "" : "none";
+    if (old) bg.title = "可更新到 " + s.appLatest + "：在手机上打开 App，点「电脑上有新版本」";
+    d.classList.toggle("offl", !p.online && !p.pending);
+    var ih = esc(info);
+    var ie = d.querySelector(".info");
+    if (ie.dataset.h !== ih) { ie.dataset.h = ih; ie.innerHTML = ih; }
+    var live = !!views[p.id];
+    d.classList.toggle("pend", !!p.pending);
+    d.classList.toggle("live", live);
+    // 画面底部：取景开关 + 「⋯」菜单（设为默认、改名、移除）
+    var ctl = p.pending ? "" : (p.online ? "<button data-a='live'" + (live ? " class='stop'>■ 结束" : ">▶ 取景") + "</button>" : "") +
+      "<button data-a='menu' title='更多'>⋯</button>";
+    var cb = d.querySelector(".ctl");
+    if (cb.dataset.h !== ctl) { cb.dataset.h = ctl; cb.innerHTML = ctl; }
+    var acts = p.pending ? "<button class='b primary' data-a='approve'>允许</button><button class='b danger' data-a='deny'>拒绝</button>" : "";
+    var box = d.querySelector(".acts");
+    if (box.dataset.h !== acts) { box.dataset.h = acts; box.innerHTML = acts; }
+  }
+  var refreshing = null;   // { at, before: { 手机编号: 点之前的封面时间 } }
+  $("coverAll").addEventListener("click", function () {
+    var before = {};
+    (S.phones || []).filter(function (p) { return p.online; }).forEach(function (p) { before[p.id] = p.cover || 0; });
+    if (!Object.keys(before).length) { toast("没有在线的手机"); return; }
+    refreshing = { at: Date.now(), before: before };
+    api("/api/phones/refresh", {}).then(function () { render(); });
+    setTimeout(function () { if (S) render(); }, 12500);
+    setTimeout(function () { if (refreshing && Date.now() - refreshing.at > 60000) { refreshing = null; if (S) render(); } }, 61000);
+  });
+
+  function verLess(a, b) {   // "0.6.2" < "0.7.0"
+    var x = String(a).split(".").map(Number), y = String(b).split(".").map(Number);
+    for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); }
+    return false;
+  }
+
+  function startRename(d, id) {
+    var nm = d.querySelector(".nm"); if (!nm || d.querySelector(".nmedit")) return;
+    var inp = document.createElement("input");
+    inp.className = "nmedit"; inp.maxLength = 16; inp.value = d.dataset.name || "";
+    nm.style.display = "none"; nm.parentNode.insertBefore(inp, nm);
+    inp.focus(); inp.select();
+    var done = function (save) {
+      if (!inp.parentNode) return;
+      var v = inp.value.trim();
+      inp.remove(); nm.style.display = "";
+      if (save && v && v !== d.dataset.name) act("/api/phones/rename", { id: id, name: v }, "已改名");
+    };
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
+    inp.addEventListener("blur", function () { done(true); });
+  }
+  var menuFor = null;
+  function openMenu(btn, id) {
+    var m = $("phMenu"), d = cards[id], isDef = S.prefs.defaultPhone === id;
+    var ph = (S.phones || []).filter(function (x) { return x.id === id; })[0] || {};
+    var ver = ph.app && ph.appVersion && S.appLatest && verLess(ph.appVersion, S.appLatest) ? " <span class='upd'>· 可更新到 " + esc(S.appLatest) + "</span>" : "";
+    var hd = d && (d.dataset.kind || d.dataset.cam) ? "<div class='mi'><b>" + esc(d.dataset.kind) + "</b>" + ver + (d.dataset.cam ? "<br>" + esc(d.dataset.cam.replace(/^前置/, "前置摄像头").replace(/^后置/, "后置摄像头")) : "") + "</div>" : "";
+    m.innerHTML = hd + "<div data-m='def'>" + (isDef ? "取消默认机位" : "设为默认机位") + "</div><div data-m='rename'>改名</div>" +
+      (ph.online ? "" : "<div data-m='remove' class='danger'>移除</div>");
+    var r = btn.getBoundingClientRect();
+    m.style.left = Math.max(8, Math.min(window.innerWidth - 150, r.left + r.width / 2 - 70)) + "px";
+    m.style.top = (r.bottom + 6) + "px";
+    if (menuFor && cards[menuFor]) cards[menuFor].classList.remove("menu");
+    m.classList.add("on"); menuFor = id; if (d) d.classList.add("menu");
+  }
+  document.addEventListener("click", function (e) {
+    var m = $("phMenu"); if (!m.classList.contains("on")) return;
+    var it = e.target.closest && e.target.closest("#phMenu [data-m]");
+    var id = menuFor; m.classList.remove("on"); menuFor = null;
+    if (id && cards[id]) cards[id].classList.remove("menu");
+    if (!it || !id) return;
+    var d = cards[id], name = d ? d.dataset.name : "";
+    if (it.dataset.m === "def") act("/api/prefs", { defaultPhone: S.prefs.defaultPhone === id ? "" : id }, "已保存");
+    if (it.dataset.m === "rename" && d) startRename(d, id);
+    if (it.dataset.m === "remove" && confirm("从名单里移除「" + name + "」？它以后再打开拍照页会重新出现。")) act("/api/phones/remove", { id: id }, "已移除");
+  });
+  window.addEventListener("scroll", function () { $("phMenu").classList.remove("on"); if (menuFor && cards[menuFor]) cards[menuFor].classList.remove("menu"); menuFor = null; }, true);
+
+  function renderWall(s) {
+    var seen = {};
+    s.phones.forEach(function (p) {
+      seen[p.id] = 1;
+      updateCard(cards[p.id] || (cards[p.id] = makeCard(p)), p, s);
+      if (!p.online && views[p.id]) viewStop(p.id);
+    });
+    Object.keys(cards).forEach(function (id) {
+      if (!seen[id]) { viewStop(id); cards[id].remove(); delete cards[id]; }
+    });
+    var opts = "<option value=''>所有在线机位同时拍</option>" + s.phones.map(function (p) {
+      return "<option value='" + esc(p.id) + "'>只用「" + esc(p.name) + "」</option>"; }).join("");
+    if (document.activeElement !== $("defPhone") && $("defPhone").dataset.h !== opts + s.prefs.defaultPhone) {
+      $("defPhone").dataset.h = opts + s.prefs.defaultPhone;
+      $("defPhone").innerHTML = opts; $("defPhone").value = s.prefs.defaultPhone || "";
+    }
+  }
+
+  // =================== 添加机位：虚线手机里放一个二维码 ===================
+  // 新手机和连过的手机扫同一个码：教程页会自动检测，信任过证书的直接跳到拍照页
+  var addOpen = false, known = null;
+  function renderAdd() {
+    var scr = $("addScreen");
+    $("addSlot").classList.toggle("open", addOpen);
+    if (!addOpen) {
+      scr.innerHTML = "<button class='plus' id='addGo'><span>＋</span>添加机位</button>";
+      $("addGo").addEventListener("click", function () { addOpen = true; known = (S ? S.phones : []).map(function (p) { return p.id; }); renderAdd(); });
+      return;
+    }
+    scr.innerHTML = "<div class='qtitle'>用手机扫码</div>" +
+      "<img class='qr' src='/qr.svg?text=" + encodeURIComponent(S.setupUrl) + "' alt='二维码'><div class='qrurl'>" + esc(S.setupShown || "") + "</div>" +
+      "<ol><li>手机和电脑连同一个 Wi-Fi（别用访客网络）</li><li>用手机相机扫码，打开后按手机上的提示做</li>" +
+      "<li>只需做一次，以后手机会自动连回来</li></ol>" +
+      "<div class='waitline' id='addWait'>等待手机连接…</div>" +
+      "<button class='b' id='addClose' style='margin-top:6px'>收起</button>";
+    $("addClose").addEventListener("click", function () { addOpen = false; known = null; renderAdd(); });
+    checkAdded();
+  }
+  function checkAdded() {
+    if (!addOpen || !known || !$("addWait")) return;
+    var fresh = S.phones.filter(function (p) { return p.online && known.indexOf(p.id) === -1; });
+    if (fresh.length) { $("addWait").className = "waitline ok"; $("addWait").textContent = "✓ 已添加「" + fresh.map(function (p) { return p.name; }).join("」「") + "」"; }
+  }
+
+  // =================== 取景：机位屏幕里放实时画面（按需） ===================
+  var LIVE_MIN = 3, liveEnd = 0, liveTimer = 0, views = {};   // phoneId -> { sid, pc, q, beat }
+  function iceDone(pc, ms) {
+    return new Promise(function (r) {
+      if (pc.iceGatheringState === "complete") return r();
+      var to = setTimeout(r, ms);
+      pc.addEventListener("icegatheringstatechange", function () { if (pc.iceGatheringState === "complete") { clearTimeout(to); r(); } });
+    });
+  }
+  function fitVideo(v) {   // 有的手机摄像头原始画面是横的（手机页会转正），这里同样转成竖的
+    var box = v.parentNode, rot = v.videoWidth > v.videoHeight;
+    v.style.width = rot ? box.clientHeight + "px" : "100%";
+    v.style.height = rot ? box.clientWidth + "px" : "100%";
+    v.style.transform = "translate(-50%,-50%)" + (rot ? " rotate(90deg)" : "");
+  }
+  async function viewStart(id) {
+    var d = cards[id]; if (!d || views[id]) return;
+    var scr = d.querySelector(".screen"), v = d.querySelector("video"), st = d.querySelector(".lv");
+    var w = views[id] = { sid: null, pc: null, q: "low", beat: 0 };
+    scr.classList.add("live"); st.textContent = "● 连接中…";
+    if (S) render();
+    try {
+      w.sid = (await api("/api/live/start", { phone: id, q: "low" })).sid;
+      var ph = (S && S.phones || []).filter(function (p) { return p.id === id; })[0];
+      if (ph && ph.app) {   // 安卓 App：画面是一帧帧的 JPEG（MJPEG），不走网页实时视频
+        scr.classList.add("app");
+        var mj = scr.querySelector("img.mj");
+        if (!mj) { mj = document.createElement("img"); mj.className = "mj"; mj.alt = ""; scr.appendChild(mj); }
+        mj.onload = function () { if (views[id] === w) st.textContent = "● 实时取景中"; };
+        mj.src = "/api/live/mjpeg?sid=" + w.sid;
+        var mbeat = async function () {
+          if (views[id] !== w) return;
+          try { var j = await api("/api/live/ping", { sid: w.sid, q: w.q }); if (j.state === "ended") { viewStop(id); return; } }
+          catch (e) { st.textContent = "● 连接失败"; }
+          w.beat = setTimeout(mbeat, 2500);
+        };
+        mbeat();
+        return;
+      }
+      var pc = w.pc = new RTCPeerConnection({ iceServers: [] });
+      pc.ontrack = function (ev) { v.srcObject = ev.streams[0] || new MediaStream([ev.track]); };
+      pc.onconnectionstatechange = function () {
+        st.textContent = { connected: "● 实时取景中", connecting: "● 连接中…", failed: "● 连接失败", disconnected: "● 连接中断" }[pc.connectionState] || st.textContent;
+      };
+      var answered = false;
+      var beat = async function () {
+        if (views[id] !== w) return;
+        try {
+          var j = await api("/api/live/ping", { sid: w.sid, q: w.q });
+          if (j.state === "ended") { viewStop(id); return; }
+          if (j.offer && !answered) {
+            answered = true;
+            await pc.setRemoteDescription({ type: "offer", sdp: j.offer });
+            await pc.setLocalDescription(await pc.createAnswer());
+            await iceDone(pc, 2500);
+            await api("/api/live/answer", { sid: w.sid, sdp: pc.localDescription.sdp });
+          }
+        } catch (e) { st.textContent = "● 连接失败"; }
+        w.beat = setTimeout(beat, answered ? 2500 : 700);   // 心跳：电脑这边一停，手机 8 秒内自动停止发送
+      };
+      beat();
+    } catch (e) { st.textContent = "● 打不开：" + e.message; }
+  }
+  function viewStop(id) {
+    var w = views[id]; if (!w) return;
+    delete views[id];
+    clearTimeout(w.beat);
+    try { if (w.pc) w.pc.close(); } catch (e) {}
+    if (w.sid) api("/api/live/stop", { sid: w.sid }).catch(function () {});
+    var d = cards[id];
+    if (d) {
+      d.classList.remove("big"); d.querySelector(".screen").classList.remove("live", "app"); d.querySelector("video").srcObject = null;
+      var mj = d.querySelector("img.mj"); if (mj) { mj.removeAttribute("src"); mj.remove(); }
+    }
+    if (!Object.keys(views).length) { clearInterval(liveTimer); liveTimer = 0; $("liveWarn").classList.remove("on"); }
+    if (S) render();
+  }
+  function zoom(id) {   // 放大这台（720p 更清晰），再点缩小回 480p
+    var d = cards[id], w = views[id]; if (!d || !w) return;
+    var big = !d.classList.contains("big");
+    d.classList.toggle("big", big); w.q = big ? "high" : "low";
+    setTimeout(function () { fitVideo(d.querySelector("video")); }, 250);
+  }
+  function tick() {
+    var left = Math.max(0, Math.round((liveEnd - Date.now()) / 1000));
+    $("liveCd").textContent = Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2) + " 后自动关闭";
+    if (!left) { liveEndAll(); toast("实时取景已自动结束，避免手机长时间发热"); }
+  }
+  function liveOpen(ids) {
+    if (!Object.keys(views).length) { liveEnd = Date.now() + LIVE_MIN * 60000; clearInterval(liveTimer); liveTimer = setInterval(tick, 1000); }
+    $("liveWarn").classList.add("on"); tick();
+    ids.forEach(viewStart);
+  }
+  function liveEndAll() { Object.keys(views).forEach(viewStop); }
+  $("liveAll").addEventListener("click", function () {
+    var ids = (S ? S.phones : []).filter(function (p) { return p.online; }).map(function (p) { return p.id; });
+    if (!ids.length) { toast("没有在线的机位"); return; }
+    liveOpen(ids);
+  });
+  $("liveMore").addEventListener("click", function () { liveEnd = Date.now() + LIVE_MIN * 60000; tick(); });
+  $("liveStopAll").addEventListener("click", liveEndAll);
+  // 设置页切走（最小化、切标签）就立即停止，必须按需
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState !== "visible") liveEndAll(); });
+  window.addEventListener("pagehide", liveEndAll);
+
+  // =================== 其余 ===================
+  function render() {
+    var s = S;
+    $("top").innerHTML = "<span class='ok'>● 运行中</span>";
+    $("infoIp").textContent = s.lanIp; $("infoVer").textContent = s.version;
+    var tt = "Open Your Eyes v" + s.version;   // 品牌名和版本号放在窗口 / 标签页的标题里
+    if (document.title !== tt) document.title = tt;
+    renderWall(s);
+    if (addOpen) checkAdded(); else if (!$("addGo")) renderAdd();
+    $("photoDir").textContent = s.photos.dir; $("photoDir").title = s.photos.dir;
+    $("photoUse").textContent = s.photos.count + " 张 · " + size(s.photos.bytes);
+    if (document.activeElement !== $("retention")) $("retention").value = String(s.prefs.retentionDays);
+    var a = s.autostart;
+    if (a.enabled && a.current === false && !autoFixed) {   // 程序换了位置（比如升级、搬了目录）：悄悄改到新位置
+      autoFixed = true; api("/api/autostart", { on: true }).catch(function () {});
+    }
+    $("autoSw").classList.toggle("on", !!a.enabled);
+    $("autoTxt").textContent = a.error ? "无法设置" : a.enabled ? "已开启" : "已关闭";
+    var online = s.phones.filter(function (p) { return p.online; });
+    var approved = s.phones.filter(function (p) { return !p.pending; });
+    // 诊断：只列出问题；一切正常就一句话
+    var probs = [];
+    if (!s.https.running && !s.https.starting) probs.push("手机连接通道没开：" + esc(s.https.error || "未知原因") + "，请点「一键修复」");
+    if (!s.cert.ok) probs.push("电脑的安全证书需要更新（" + esc(s.cert.reason) + "），请点「一键修复」");
+    if (approved.length && !online.length) probs.push("手机都不在线：手机上的拍照页要开着、屏幕亮着；装了 App 的打开 App 即可");
+    renderAlerts(s);
+    $("checks").innerHTML = probs.length ? probs.map(function (t) { return "<div><span class='bad'>✕</span> " + t + "</div>"; }).join("")
+      : "<div><span class='ok'>✓</span> 一切正常" + (online.length ? "，" + online.length + " 台手机在线" : "") + "</div>";
+    // 没有在线手机时，「拍照用哪台」「全部实时取景」都用不上，先藏起来
+    $("defPhone").style.display = $("defPhone").previousElementSibling.style.display = online.length ? "" : "none";
+    $("liveAll").style.display = $("coverAll").style.display = online.length ? "" : "none";
+    renderAi(s, approved);
+    // 只有电脑上确实有两个以上能用的网络（比如同时插网线和连 Wi-Fi）才让用户选；VPN、虚拟网卡不算
+    var cands = (s.ipCandidates || []).filter(function (c) { return c.score > 0 || c.ip === s.prefs.lanIp; });
+    $("ipRow").style.display = $("ipLabel").style.display = cands.length > 1 ? "" : "none";
+    if (cands.length > 1 && document.activeElement !== $("lanIp")) {
+      var opts = "<option value=''>自动（现在是 " + esc(s.lanIp) + "）</option>" + cands.map(function (c) {
+        return "<option value='" + esc(c.ip) + "'>" + esc(c.ip) + "（" + esc(c["if"]) + "）</option>"; }).join("");
+      if ($("lanIp").dataset.h !== opts) { $("lanIp").dataset.h = opts; $("lanIp").innerHTML = opts; }
+      $("lanIp").value = s.prefs.lanIp || "";
+    }
+    $("events").innerHTML = s.events.slice().reverse().map(function (e) { return "<div>" + esc(e.t) + " · " + esc(e.text) + "</div>"; }).join("") || "<div>暂无事件</div>";
+  }
+
+  var autoFixed = false, seenAi = null, aiMsg = {}, aiBusy = {};
+  function agoText(sec) {
+    return sec < 60 ? "刚刚" : sec < 3600 ? Math.floor(sec / 60) + " 分钟前" : sec < 86400 ? Math.floor(sec / 3600) + " 小时前" : Math.floor(sec / 86400) + " 天前";
+  }
+  var AI_IC = { claude_desktop: "C", claude_code: "CC", codex: "Cx", workbuddy: "WB" };
+  var AI_CLS = { claude_desktop: "claude", claude_code: "claude" };
+  function renderAi(s, approved) {
+    var ai = s.ai || {}, list = ai.list || [], found = list.filter(function (a) { return a.found; });
+    var html = found.map(function (a) {
+      var ready = a.installed || a.agoS != null, right;
+      if (aiBusy[a.id]) right = "<span class='mut'>安装中…</span>";
+      else if (ready) right = "<span class='ready'>已就绪</span>";
+      else right = "<button class='b' data-ai='" + a.id + "'>一键安装</button>";
+      var sub = a.agoS != null ? "最近使用 · " + agoText(a.agoS) : ready ? "已安装" : "检测到，还没安装";
+      var how = a.id === "claude_desktop" ? "重启 Claude 桌面版" : "新开对话";
+      if (a.ver === s.version) sub += " · 用的是 " + a.ver;
+      else if (ready) sub += " · <span class='upd'>" + (a.ver ? "用的是 " + esc(a.ver) + "，" : "还没用上 " + esc(s.version) + "，") + how + "后用上</span>";
+      return "<div class='airow'><span class='ic " + (AI_CLS[a.id] || "") + "'>" + (AI_IC[a.id] || "AI") + "</span><span class='nm2'><b>" + esc(a.name) +
+        "</b><small>" + sub + "</small></span>" + right + "</div>";
+    }).join("") || "<div class='airow empty'>没有检测到 Claude、Claude Code、Codex 或 WorkBuddy。装好其中一个后，这里会自动出现。</div>";
+    if ($("aiRows").dataset.h !== html) { $("aiRows").dataset.h = html; $("aiRows").innerHTML = html; }
+    // 提示区：装完之后要做的事都集中在这里（已经连上的就不再提示）
+    var notes = Object.keys(aiMsg).filter(function (id) {
+      var a = list.filter(function (x) { return x.id === id; })[0];
+      return !(a && a.agoS != null && a.agoS < 120 && aiMsg[id].ok);
+    }).map(function (id) {
+      var a = list.filter(function (x) { return x.id === id; })[0];
+      return "<div>" + esc(a ? a.name : id) + "：" + esc(aiMsg[id].text) + "</div>";
+    }).join("");
+    if (notes) notes = "<span class='i'>i</span><div>" + notes + "</div>";
+    if ($("aiNotice").dataset.h !== notes) { $("aiNotice").dataset.h = notes; $("aiNotice").innerHTML = notes; }
+    $("aiNotice").classList.toggle("on", !!notes);
+    var missing = list.filter(function (a) { return !a.found; }).map(function (a) { return a.name; });
+    $("aiMissing").textContent = missing.length ? "没检测到：" + missing.join("、") + "（装好后会自动出现在上面）" : "";
+    $("aiUrl").textContent = ai.url || "";
+    var readyCount = found.filter(function (a) { return a.installed || a.agoS != null; }).length;
+    $("aiCount").textContent = found.length ? readyCount + " 个已就绪" : "";
+    // 新连上的 AI：提示一下
+    var names = list.filter(function (a) { return a.agoS != null; }).map(function (a) { return a.name; });
+    if (seenAi) names.filter(function (n) { return seenAi.indexOf(n) === -1; }).forEach(function (n) {
+      toast("✓ " + n + " 已连上 Open Your Eyes，可以开始用了");
+    });
+    seenAi = names;
+    // 三步引导
+    var done = [readyCount > 0 || ai.lastSeenAgoS != null, approved.length > 0, !!s.photosTaken];
+    var cur = done.indexOf(false);
+    ["g1", "g2", "g3"].forEach(function (id, i) {
+      $(id).classList.toggle("done", done[i]);
+      $(id).classList.toggle("now", i === cur);
+    });
+    $("guide").classList.toggle("on", cur !== -1);
+  }
+  $("aiRows").addEventListener("click", function (e) {
+    var id = e.target.dataset && e.target.dataset.ai; if (!id) return;
+    aiBusy[id] = true; delete aiMsg[id]; if (S) render();
+    api("/api/ai/install", { id: id }).then(function (j) {
+      aiMsg[id] = { ok: j.ok, text: j.msg }; delete aiBusy[id]; refresh();
+    }).catch(function (err) { delete aiBusy[id]; aiMsg[id] = { ok: false, text: "安装失败：" + err }; refresh(); });
+  });
+  var inApp = function () { return window.pywebview && window.pywebview.api; };
+  $("aiExt").addEventListener("click", function (e) {
+    if (!inApp()) return;
+    e.preventDefault();
+    window.pywebview.api.save_extension().then(function () { toast("已保存到「下载」"); });
+  });
+
+  // 顶部提示：有手机连不上时，用大白话说清楚是哪台、怎么办
+  function renderAlerts(s) {
+    var items = [];
+    if (!s.https.running && s.https.starting) items.push("<b>正在开启手机连接…</b>如果屏幕上弹出「允许 Open Your Eyes 查找本地网络上的设备」，请点<b>「允许」</b>，否则手机连不上这台电脑。");
+    else if (!s.https.running) items.push("<b>手机现在都连不上电脑</b>：" + esc(s.https.error || "手机连接通道没开") + "。先点右边「诊断」里的「一键修复」；还不行就重启 Open Your Eyes。");
+    (s.untrusted || []).forEach(function (ip) {
+      var ph = s.phones.filter(function (p) { return p.ip === ip; })[0];
+      var who = ph ? "「" + esc(ph.name) + "」（" + esc(ph.device || "手机") + "）" : "地址是 " + esc(ip) + " 的手机";
+      items.push("<b>" + who + "连不上电脑</b>：电脑的安全证书更新过，这台手机还没重新信任。" +
+        "怎么办：点下面的「＋ 添加机位」，<b>用这台手机扫码</b>，按手机上的提示重新信任一次（约 1 分钟）。");
+    });
+    s.phones.filter(function (p) { return p.pending; }).forEach(function (p) {
+      items.push("<b>有一台新手机请求加入</b>（" + esc(p.device || "") + " " + esc(p.ip || "") + "）：是你自己的手机，就在下面它的位置点「允许」。");
+    });
+    var html = items.map(function (t) { return "<div>⚠️ " + t + "</div>"; }).join("");
+    if (s.update) html += "<div class='upd-bar'><b>Open Your Eyes 有新版本 " + esc(s.update.version) + "</b>" +
+      (s.update.notes ? "：" + esc(s.update.notes) : "") + "　<a href=\"" + esc(s.update.page) + "\" target=\"_blank\" rel=\"noopener\">去下载</a>" +
+      "<span class='mut'>（" + (/Mac/.test(navigator.platform) ? "下载后拖进「应用程序」替换旧版" : "下载后直接安装") + "，配对过的手机和设置都会保留）</span></div>";
+    if ($("alerts").dataset.h !== html) { $("alerts").dataset.h = html; $("alerts").innerHTML = html; }
+    $("alerts").classList.toggle("on", !!html);
+  }
+
+  async function refresh() {
+    try { S = await api("/api/settings"); render(); }
+    catch (e) { $("top").innerHTML = "<span class='bad'>● 连不上 Open Your Eyes：请确认程序在运行</span>"; }
+  }
+  $("defPhone").addEventListener("change", function () { act("/api/prefs", { defaultPhone: $("defPhone").value }, "已保存"); });
+  // 在 Open Your Eyes 程序窗口里：导出诊断直接存到「下载」并在文件夹里显示（窗口里没有浏览器的下载栏）
+  $("diagZip").addEventListener("click", function (e) {
+    if (!(window.pywebview && window.pywebview.api)) return;
+    e.preventDefault();
+    window.pywebview.api.export_diagnostics().then(function (fp) { toast("已保存：" + fp); })
+      .catch(function (err) { toast("导出失败：" + err); });
+  });
+  $("lanIp").addEventListener("change", function () { act("/api/prefs", { lanIp: $("lanIp").value }, "已保存，手机需要重新扫码"); });
+  $("retention").addEventListener("change", function () { act("/api/prefs", { retentionDays: +$("retention").value }, "已保存"); });
+  $("clearAll").addEventListener("click", function () {
+    if (confirm("删除这台电脑上保存的全部照片？删除后无法恢复。")) act("/api/photos/clear", {}, "已清空");
+  });
+  $("autoSw").addEventListener("click", function (e) {
+    e.preventDefault();
+    act("/api/autostart", { on: !S.autostart.enabled }, S.autostart.enabled ? "已关闭开机自启" : "已开启开机自启");
+  });
+  $("repair").addEventListener("click", function () {
+    if (!confirm("一键修复会重新生成电脑的连接证书，并重启和手机的连接。\n\n" +
+      "· 按教程信任过证书的手机、装了 App 的手机：不受影响，会自动连回来\n" +
+      "· 靠点「继续浏览 / 继续访问」连上的手机（比如 vivo 浏览器、临时放行过的 iPhone）：要在手机上再点一次「继续」\n\n" +
+      "确定要修复吗？")) return; act("/api/repair", {}, "已修复：证书已重新签发"); });
+
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

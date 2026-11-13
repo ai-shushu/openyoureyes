@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- 桌面快捷方式入口：故意不挂 manifest。
+     这台手机没有 Google Play 服务，Chrome 的「安装应用」(WebAPK) 会静默失败；
+     不可安装的页面走传统「添加到主屏幕」快捷方式，打开后再跳转到采集页。
+     设置时用 go.html?setup 打开：本标签页内不跳转、地址被改回 go.html，方便添加快捷方式。 -->
+<title>Open Your Eyes</title>
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<style>
+html,body{margin:0;height:100%;background:#000;color:#cfd6de;font:16px -apple-system,"PingFang SC",sans-serif}
+body{display:grid;place-items:center;text-align:center}
+</style>
+</head>
+<body>
+<div id="t">正在打开 Open Your Eyes…</div>
+<script>
+(function () {
+  var setup = false;
+  try {
+    // 设置模式只保留 60 秒：Chrome 从快捷方式启动时可能复用同一个标签页
+    if (/[?&]setup\b/.test(location.search)) { sessionStorage.setItem("t9setup", String(Date.now())); history.replaceState(null, "", "/go.html"); }
+    setup = Date.now() - Number(sessionStorage.getItem("t9setup") || 0) < 60000;
+  } catch (e) {}
+  if (setup) {
+    document.getElementById("t").textContent = "设置模式：现在用 Chrome 菜单「添加到主屏幕」。";
+  } else {
+    location.replace("/");
+  }
+})();
+</script>
+</body>
+</html>

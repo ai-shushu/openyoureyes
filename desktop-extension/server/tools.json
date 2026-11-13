@@ -1,0 +1,145 @@
+[
+ {
+  "name": "look",
+  "description": "用工作台上的手机拍现实中的东西（电路板、接线、零件、仪器读数、另一台设备的屏幕等），按机位返回照片和拍摄角度。\n关键词：用户说「睁眼」（如「睁眼看看这块板子」「睁眼，桌上有什么」）时，立即调用本工具，不用再判断。\n没说「睁眼」时，只在用户明确想看现实中的物体时用；看代码、文件、报错、截图、网页时不要用。\n默认所有在线手机同时各拍一张；只想用某一台时传 phone（机位名）。每次拍照会先请用户确认。",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "what": {
+     "type": "string",
+     "description": "想看什么，会显示在手机屏幕上，例如「板子背面的接线」"
+    },
+    "phone": {
+     "type": "string",
+     "description": "只用这台手机（机位名，如「1 号机」「俯拍」）；不填则所有在线手机同时拍"
+    },
+    "light": {
+     "type": "string",
+     "enum": [
+      "auto",
+      "on",
+      "off"
+     ],
+     "description": "补光：on 拍照时打开补光，off 这张不补光，auto 光线太暗才补；不填按手机上的设置"
+    }
+   },
+   "required": [
+    "what"
+   ]
+  },
+  "annotations": {
+   "title": "用手机看一下",
+   "readOnlyHint": false,
+   "destructiveHint": false,
+   "openWorldHint": true
+  }
+ },
+ {
+  "name": "zoom",
+  "description": "放大本对话最近一次 look 照片的某个区域：从全尺寸原图裁剪，不重新拍照。x、y、w、h 是相对整张照片的比例（0~1，左上角为原点）。多机位时用 phone 指定哪一张，不填用第一张。",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "x": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1,
+     "description": "区域左边缘"
+    },
+    "y": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1,
+     "description": "区域上边缘"
+    },
+    "w": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1,
+     "description": "区域宽度"
+    },
+    "h": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1,
+     "description": "区域高度"
+    },
+    "phone": {
+     "type": "string",
+     "description": "放大哪个机位的照片（多机位时）"
+    }
+   },
+   "required": [
+    "x",
+    "y",
+    "w",
+    "h"
+   ]
+  },
+  "annotations": {
+   "title": "放大局部",
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ },
+ {
+  "name": "look_clip",
+  "description": "用工作台上的手机在一段时间内连拍几帧，看现实中正在变化的东西（指示灯闪烁、屏幕刷新、零件运动）。用户说「睁眼」并提到要看变化、连拍、录一段时用它；其余规则同 look。按机位返回各帧照片和拍摄角度。",
+  "inputSchema": {
+   "type": "object",
+   "properties": {
+    "what": {
+     "type": "string",
+     "description": "想看什么，会显示在手机屏幕上"
+    },
+    "seconds": {
+     "type": "number",
+     "minimum": 0.5,
+     "maximum": 5,
+     "description": "总时长（秒），默认 2"
+    },
+    "frames": {
+     "type": "integer",
+     "minimum": 2,
+     "maximum": 8,
+     "description": "帧数，默认 4"
+    },
+    "phone": {
+     "type": "string",
+     "description": "只用这台手机（机位名，如「1 号机」「俯拍」）；不填则所有在线手机同时拍"
+    },
+    "light": {
+     "type": "string",
+     "enum": [
+      "auto",
+      "on",
+      "off"
+     ],
+     "description": "补光：on 拍照时打开补光，off 这张不补光，auto 光线太暗才补；不填按手机上的设置"
+    }
+   },
+   "required": [
+    "what"
+   ]
+  },
+  "annotations": {
+   "title": "连拍一段",
+   "readOnlyHint": false,
+   "destructiveHint": false,
+   "openWorldHint": true
+  }
+ },
+ {
+  "name": "eyes_status",
+  "description": "各台手机（机位）是否在线、拍照页是否在前台。",
+  "inputSchema": {
+   "type": "object",
+   "properties": {}
+  },
+  "annotations": {
+   "title": "手机眼睛状态",
+   "readOnlyHint": true,
+   "openWorldHint": false
+  }
+ }
+]

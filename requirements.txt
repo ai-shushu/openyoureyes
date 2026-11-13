@@ -1,0 +1,6 @@
+Pillow
+cryptography>=42
+qrcode>=7.4
+psutil>=5.9
+pystray>=0.19
+pywebview>=5

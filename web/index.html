@@ -1,0 +1,1403 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<title>Open Your Eyes</title>
+<style>
+:root { color-scheme: dark; --ok: #35c46a; --warn: #e0a458; --bad: #e35b5b; --blue: #1f6feb; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color: #e8edf2; }
+body { font: 14px/1.45 -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+button { font-family: inherit; }
+
+/* ---------- 画面：占满整屏 ---------- */
+.stage { position: fixed; inset: 0; background: #000; }
+#preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.grid { position: absolute; inset: 0; pointer-events: none; display: none; }
+.grid.on { display: block; }
+.grid i { position: absolute; background: rgba(255,255,255,.22); }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.flash.on { opacity: .75; transition: none; }
+
+/* ---------- 顶部 HUD：半透明，只放决策最相关的信息 ---------- */
+.hud {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 5;
+  padding: calc(env(safe-area-inset-top) + 8px) 12px 18px;
+  background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0));
+  display: flex; align-items: flex-start; gap: 10px; pointer-events: none;
+}
+.hud .l { flex: 1; min-width: 0; }
+.line1 { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.conn { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: rgba(0,0,0,.35); color: #8b97a5; white-space: nowrap; }
+.conn.on { color: var(--ok); } .conn.off { color: var(--bad); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7684; flex: none; }
+.dot.connecting { background: var(--warn); }
+.dot.live { background: var(--ok); }
+.dot.error { background: var(--bad); }
+.line2 { font-size: 12px; color: #b7c2ce; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.line2 b { font-weight: 600; }
+.line2.guide { font-size: 14px; font-weight: 600; color: #e8edf2; margin: 4px 0 2px; }
+.line2.guide.ok { color: #6ee7a0; }
+.line2.guide.bad { color: #ffb36b; }
+.good { color: var(--ok); } .mid { color: var(--warn); } .bad { color: var(--bad); }
+
+/* 水平仪：气泡偏离中心表示镜头没有正对（俯拍时） */
+.level { width: 54px; height: 54px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.45);
+  position: relative; flex: none; background: rgba(0,0,0,.25); }
+.level::before, .level::after { content: ""; position: absolute; background: rgba(255,255,255,.35); }
+.level::before { left: 50%; top: 8px; bottom: 8px; width: 1px; }
+.level::after { top: 50%; left: 8px; right: 8px; height: 1px; }
+.level .ring { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; border: 1px dashed rgba(255,255,255,.5); }
+.level .bub { position: absolute; left: 50%; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+  border-radius: 50%; background: var(--warn); transition: transform .08s linear, background .2s; }
+.level .bub.good { background: var(--ok); }
+.level .bub.bad { background: var(--bad); }
+
+/* ---------- 底部操作区 ---------- */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  padding: 20px 18px calc(env(safe-area-inset-bottom) + 14px);
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.5));
+  display: flex; align-items: center;
+}
+/* 底部只有几个小图标：手机是摆好的机位，不是相机，没有快门 */
+.dock .grow { flex: 1; }
+.round { width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14);
+  color: #fff; font-size: 16px; display: grid; place-items: center; backdrop-filter: blur(6px); margin-left: 12px; }
+.round:first-child { margin-left: 0; }
+.round:active { background: rgba(255,255,255,.3); }
+.round.hide { display: none; }
+.round.on { background: var(--warn); color: #111; }
+.round small { font-size: 10px; font-weight: 700; margin-left: 1px; }
+/* 前置补光：拍摄瞬间整屏变白照亮物体 */
+.screenfill { position: fixed; inset: 0; z-index: 20; background: #fff; display: none; }
+/* 画面中央的说明：摄像头打不开等需要用户动手的情况 */
+.notice { position: fixed; left: 16px; right: 16px; top: 38%; z-index: 6; display: none; text-align: center;
+  background: rgba(0,0,0,.78); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 16px; font-size: 15px; line-height: 1.6; }
+.notice.on { display: block; }
+.notice b { color: var(--warn); font-size: 17px; display: block; margin-bottom: 6px; }
+.notice button { margin-top: 10px; font: inherit; padding: 8px 16px; border-radius: 10px; border: 0; background: var(--blue); color: #fff; }
+.screenfill.on { display: block; }
+details.diag summary { font-size: 12px; color: #8b97a5; cursor: pointer; margin-bottom: 8px; }
+/* ---------- 设置抽屉：非常用信息全部折叠在这里 ---------- */
+.sheet-mask { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: none; }
+.sheet-mask.on { display: block; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; max-height: 78vh; overflow-y: auto;
+  background: #121820; border-radius: 16px 16px 0 0; border-top: 1px solid #263140;
+  padding: 10px 16px calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateY(105%); transition: transform .22s ease;
+}
+.sheet.on { transform: none; }
+.grab { width: 38px; height: 4px; border-radius: 2px; background: #3a4656; margin: 2px auto 12px; }
+.sec { margin-bottom: 14px; }
+.sec h3 { font-size: 12px; font-weight: 500; color: #8b97a5; margin: 0 0 7px; }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; padding: 9px 4px; font-size: 13px; background: #0b1015; color: #8b97a5;
+  border: 1px solid #2a3644; border-radius: 10px; }
+.seg button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.row { display: flex; gap: 8px; align-items: center; }
+input[type=text] { width: 100%; padding: 9px 11px; border-radius: 10px; border: 1px solid #2a3644;
+  background: #0b1015; color: #e8edf2; font-size: 12px; outline: none; }
+.btn { padding: 9px 14px; border-radius: 10px; border: 1px solid #2a3644; background: #0b1015;
+  color: #e8edf2; font-size: 13px; white-space: nowrap; }
+.btn.stop { background: #8a2c30; border-color: #8a2c30; }
+.toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #c8d2dd; }
+.toggle input { accent-color: var(--blue); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12px; }
+.kv dt { color: #8b97a5; } .kv dd { margin: 0; color: #dfe6ee; font-variant-numeric: tabular-nums; word-break: break-all; }
+.msg { color: var(--warn); font-size: 12px; white-space: pre-wrap; }
+.note { color: #6f7c8b; font-size: 11px; line-height: 1.6; }
+.toast { position: fixed; left: 50%; top: 45%; transform: translate(-50%,-50%); z-index: 8;
+  background: rgba(0,0,0,.72); padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none; text-align: center; }
+.toast.on { display: block; }
+/* Claude 请求拍照时的全屏提示 */
+.count { position: fixed; inset: 0; z-index: 7; display: none; place-items: center; background: rgba(0,0,0,.25); }
+.count.on { display: grid; }
+.count b { font-size: 140px; font-weight: 700; color: #fff; text-shadow: 0 4px 24px rgba(0,0,0,.6); line-height: 1; }
+.count small { display: block; text-align: center; font-size: 15px; color: #dfe6ee; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <canvas id="preview"></canvas>
+  <div class="grid" id="grid">
+    <i style="left:33.33%;top:0;bottom:0;width:1px"></i><i style="left:66.66%;top:0;bottom:0;width:1px"></i>
+    <i style="top:33.33%;left:0;right:0;height:1px"></i><i style="top:66.66%;left:0;right:0;height:1px"></i>
+  </div>
+  <div class="flash" id="flash"></div>
+</div>
+
+<div class="hud">
+  <div class="l">
+    <div class="line1"><span class="dot" id="dot"></span><span id="title">后置</span><span id="status" style="color:#b7c2ce">准备中</span>
+      <span class="conn" id="conn">连接电脑…</span></div>
+    <div class="line2 guide" id="guide">正在连接电脑…</div>
+    <div class="line2" id="pose">姿态：等待传感器…</div>
+    <div class="line2" id="light"></div>
+  </div>
+  <div class="level" id="level"><div class="ring"></div><div class="bub" id="bub"></div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="count" id="count"><div><b id="countNum">📷</b><small>AI 想看</small></div></div>
+
+<div class="screenfill" id="screenFill"></div>
+<div class="notice" id="notice"></div>
+
+<div class="dock">
+  <button class="round" id="flip" aria-label="切换前后摄像头">⇄</button>
+  <span class="grow"></span>
+  <button class="round hide" id="torchBtn" aria-label="补光">⚡</button>
+  <button class="round" id="more" aria-label="设置">⋯</button>
+</div>
+
+<div class="sheet-mask" id="mask"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+
+  <div class="sec">
+    <h3>本机名称（多台手机时用来区分机位，如「俯拍」「侧拍」）</h3>
+    <div class="row" style="gap:8px">
+      <input id="phoneName" maxlength="16" placeholder="1 号机" style="flex:1;min-width:0;padding:9px 10px;border-radius:8px;border:1px solid #263140;background:#0b1015;color:#e8edf2;font:inherit">
+      <button id="phoneNameSave" class="btn">保存</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>摄像头</h3>
+    <div class="seg"><button id="camFront">前置</button><button id="camBack" class="active">后置</button></div>
+  </div>
+
+  <div class="sec">
+    <h3>补光</h3>
+    <div class="seg" id="lseg"><button data-l="off">关</button><button data-l="auto">自动</button><button data-l="on">常亮</button></div>
+    <div class="note" id="lightNote" style="margin-top:6px">—</div>
+  </div>
+
+  <div class="sec">
+    <h3>画质（拍照按摄像头原始分辨率）</h3>
+    <div class="seg" id="qseg">
+      <button data-q="sd">540p</button><button data-q="hd">720p</button><button data-q="fhd">1080p</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3>辅助</h3>
+    <div class="row" style="gap:18px">
+      <label class="toggle"><input type="checkbox" id="gridT">三分线</label>
+      <label class="toggle"><input type="checkbox" id="mirror">预览镜像</label>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <details class="sec diag">
+    <summary>诊断信息</summary>
+    <dl class="kv" id="sensorKv"></dl>
+    <div class="note" id="note" style="margin-top:8px"></div>
+    <div class="note" id="offline"></div>
+  </details>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = {};
+  ["dot","title","status","conn","pose","light","bub","toast","flip","torchBtn","more","mask","sheet",
+   "camFront","camBack","lseg","lightNote","qseg","gridT","grid","mirror","msg","sensorKv","screenFill",
+   "note","offline","preview","flash","count","countNum","phoneName","phoneNameSave","notice","guide"].forEach(function (k) { el[k] = $(k); });
+
+  var FACE_KEY = "t9cam.facing", QUALITY_KEY = "t9cam.quality", GRID_KEY = "t9cam.grid";
+
+  // 这台 T9 实测：源尺寸按「横向」申请，Chrome 给出旋正后的显示画面；720x1280 直接申请会 NotReadableError
+  var QUALITY = {
+    sd:  { label: "540×960",   w: 540,  h: 960,  srcW: 960,  srcH: 540,  fps: 20 },
+    hd:  { label: "720×1280",  w: 720,  h: 1280, srcW: 1280, srcH: 720,  fps: 20 },
+    fhd: { label: "1080×1920", w: 1080, h: 1920, srcW: 1920, srcH: 1080, fps: 20 }
+  };
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  // 配对密钥：扫电脑上的二维码进来时网址带 #k=…，存下来；之后发给电脑的每个请求都带上
+  var PAIR_KEY = "t9cam.pair";
+  (function () {
+    var m = /[#&]k=([\w-]+)/.exec(location.hash);
+    var mid = /[#&]id=([a-z0-9]+)/.exec(location.hash);   // 从旧端口搬过来时带着原来的编号，电脑才认得是同一台
+    if (mid) lsSet("t9cam.phoneId", mid[1]);
+    if (m || mid) { if (m) lsSet(PAIR_KEY, m[1]); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
+    var key = lsGet(PAIR_KEY), raw = window.fetch.bind(window);
+    if (!key) return;
+    window.fetch = function (url, opt) {
+      if (typeof url === "string" && url.indexOf("/api/") !== -1 && (url.charAt(0) === "/" || url.indexOf(location.origin) === 0)) {
+        opt = Object.assign({}, opt || {});
+        opt.headers = Object.assign({}, opt.headers || {}, { "X-T9-Key": key });
+      }
+      return raw(url, opt);
+    };
+  })();
+
+  var cfg = null, rawStream = null, srcVideo = null;
+  var raf = 0, running = false, gen = 0, wakeLock = null;
+  var facing = lsGet(FACE_KEY) === "user" ? "user" : "environment";
+  var quality = QUALITY[lsGet(QUALITY_KEY)] ? lsGet(QUALITY_KEY) : "fhd";
+
+  function faceName() { return facing === "user" ? "前置" : "后置"; }
+  function setStatus(kind, text) { el.dot.className = "dot" + (kind ? " " + kind : ""); el.status.textContent = text; }
+  function say(t) { el.msg.textContent = t || ""; }
+  // 把手机上的异常报给电脑（写进页面服务日志），方便排查；失败就算了
+  function report(t) {
+    try {
+      fetch(snapUrl().replace(/\/api\/snap$/, "/api/phone/log"), { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: typeof phoneId === "string" ? phoneId : "", msg: String(t).slice(0, 300) }) }).catch(function () {});
+    } catch (e) {}
+  }
+  var toastT = 0;
+  function toast(t, ms) {
+    el.toast.textContent = t; el.toast.classList.add("on");
+    clearTimeout(toastT); toastT = setTimeout(function () { el.toast.classList.remove("on"); }, ms || 1600);
+  }
+  function r1(x) { return x == null || isNaN(x) ? null : Math.round(x * 10) / 10; }
+  function r3(x) { return x == null || isNaN(x) ? null : Math.round(x * 1000) / 1000; }
+
+  // =====================================================================
+  //  传感器：浏览器侧实时姿态 / 运动（拍照瞬间与照片一起保存）
+  // =====================================================================
+  var IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var S = {
+    gravity: null,        // accelerationIncludingGravity，设备坐标系 m/s²
+    linAcc: null,         // 去掉重力的线性加速度
+    rotRate: null,        // 陀螺仪 °/s
+    orient: null,         // deviceorientation alpha/beta/gamma
+    orientAbs: null,      // deviceorientationabsolute（含罗盘）
+    motionInterval: null,
+    shakeBuf: [],         // 最近 1 秒的 |线性加速度| 与 |角速度|
+    lux: null,
+    battery: null
+  };
+
+  window.addEventListener("devicemotion", function (e) {
+    var g = e.accelerationIncludingGravity, a = e.acceleration, r = e.rotationRate;
+    // iOS Safari 的 accelerationIncludingGravity 符号与安卓 Chrome 相反（平放屏幕朝上：iOS z≈-9.8，安卓 z≈+9.8），统一成安卓约定
+    if (g && g.x != null) S.gravity = IOS ? { x: -g.x, y: -g.y, z: -g.z } : { x: g.x, y: g.y, z: g.z };
+    if (a && a.x != null) S.linAcc = { x: a.x, y: a.y, z: a.z };
+    if (r && r.alpha != null) S.rotRate = { alpha: r.alpha, beta: r.beta, gamma: r.gamma };
+    S.motionInterval = e.interval;
+    var now = performance.now();
+    var la = a && a.x != null ? Math.hypot(a.x, a.y, a.z) : null;
+    var rr = r && r.alpha != null ? Math.hypot(r.alpha, r.beta, r.gamma) : null;
+    S.shakeBuf.push({ t: now, a: la, r: rr });
+    while (S.shakeBuf.length && now - S.shakeBuf[0].t > 1000) S.shakeBuf.shift();
+  });
+  window.addEventListener("deviceorientation", function (e) {
+    if (e.beta != null) S.orient = { alpha: e.alpha, beta: e.beta, gamma: e.gamma, absolute: e.absolute };
+  });
+  window.addEventListener("deviceorientationabsolute", function (e) {
+    if (e.alpha != null) S.orientAbs = { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+  });
+
+  // Generic Sensor 的环境光（多数 Chrome 默认关闭，能用就用）
+  try {
+    if ("AmbientLightSensor" in window) {
+      var als = new AmbientLightSensor({ frequency: 2 });
+      als.addEventListener("reading", function () { S.lux = als.illuminance; });
+      als.start();
+    }
+  } catch (e) {}
+
+  try {
+    if (navigator.getBattery) navigator.getBattery().then(function (b) {
+      function upd() { S.battery = { level: Math.round(b.level * 100), charging: b.charging }; }
+      upd(); b.addEventListener("levelchange", upd); b.addEventListener("chargingchange", upd);
+    });
+  } catch (e) {}
+
+  /* 由重力向量推算相机姿态（与照片畸变直接相关）：
+   *   设备坐标：x 向右、y 向上（竖持时屏幕上沿方向）、z 垂直屏幕朝外。后置镜头朝 -z。
+   *   tiltFromDown：后置镜头光轴与「正下方」的夹角。0° = 正俯拍（平放屏幕朝上），90° = 平视。
+   *   俯拍时把重力在 x/y 上的分量换成前后、左右两个倾角，用来判断梯形畸变的方向。 */
+  function pose() {
+    var g = S.gravity;
+    if (!g) return null;
+    var n = Math.hypot(g.x, g.y, g.z) || 1;
+    var gx = g.x / n, gy = g.y / n, gz = g.z / n;
+    var back = facing !== "user";
+    var axisZ = back ? gz : -gz;                      // 镜头光轴与重力反方向的投影
+    var tiltFromDown = Math.acos(Math.max(-1, Math.min(1, axisZ))) * 180 / Math.PI;
+    var deg = function (v) { return Math.asin(Math.max(-1, Math.min(1, v))) * 180 / Math.PI; };
+    var p = {
+      tiltFromDownDeg: r1(tiltFromDown),
+      tiltFromLevelDeg: r1(90 - tiltFromDown),        // 平视时为 0，向下为正
+      pitchFrontBackDeg: r1(deg(gy)),                 // 俯拍时：画面上沿方向抬高为正（上沿离物体更远 → 上窄下宽）
+      rollLeftRightDeg: r1(deg(gx)),                  // 俯拍时：画面左右方向倾斜
+      horizonRollDeg: r1(Math.atan2(gx, gy) * 180 / Math.PI) // 平视时：画面绕光轴旋转（地平线是否水平）
+    };
+    if (tiltFromDown < 45) {
+      p.mode = "俯拍";
+      p.errDeg = r1(tiltFromDown);
+    } else if (tiltFromDown > 135) {
+      p.mode = "仰拍";
+      p.errDeg = r1(180 - tiltFromDown);
+    } else {
+      p.mode = "平视";
+      p.errDeg = r1(Math.abs(90 - tiltFromDown));
+    }
+    var heading = S.orientAbs ? S.orientAbs.alpha : null;
+    if (heading != null) p.compassDeg = r1((360 - heading) % 360);
+    return p;
+  }
+
+  function shake() {
+    var buf = S.shakeBuf;
+    if (!buf.length) return null;
+    var as = buf.map(function (b) { return b.a; }).filter(function (v) { return v != null; });
+    var rs = buf.map(function (b) { return b.r; }).filter(function (v) { return v != null; });
+    var mx = function (arr) { return arr.length ? Math.max.apply(null, arr) : null; };
+    var avg = function (arr) { return arr.length ? arr.reduce(function (s, v) { return s + v; }, 0) / arr.length : null; };
+    var rotMax = mx(rs), accMax = mx(as);
+    var level = (rotMax != null && rotMax > 20) || (accMax != null && accMax > 0.8) ? "晃动"
+              : (rotMax != null && rotMax > 5) || (accMax != null && accMax > 0.25) ? "轻微" : "稳定";
+    return { windowMs: 1000, samples: buf.length, linAccMax: r3(accMax), linAccAvg: r3(avg(as)),
+             rotRateMaxDegS: r1(rotMax), rotRateAvgDegS: r1(avg(rs)), verdict: level };
+  }
+
+  function cls(err) { return err == null ? "" : err <= 2 ? "good" : err <= 8 ? "mid" : "bad"; }
+
+  // 光线：每 0.5 秒把画面缩到 48×48 算一次平均亮度和过曝/欠曝面积，几乎不耗电
+  var L = null;   // { luma 0~255, pct 0~100, overPct, underPct, level, cls }
+  var meterCanvas = null;
+  function measureLight() {
+    if (!running || !srcVideo || !srcVideo.videoWidth) { L = null; return; }
+    try {
+      if (!meterCanvas) { meterCanvas = document.createElement("canvas"); meterCanvas.width = 48; meterCanvas.height = 48; }
+      var x = meterCanvas.getContext("2d", { willReadFrequently: true });
+      x.drawImage(srcVideo, 0, 0, 48, 48);
+      var d = x.getImageData(0, 0, 48, 48).data, n = 48 * 48, sum = 0, hi = 0, lo = 0;
+      for (var i = 0; i < d.length; i += 4) {
+        var v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        sum += v; if (v > 245) hi++; if (v < 12) lo++;
+      }
+      var luma = sum / n, over = hi / n * 100, under = lo / n * 100;
+      var level = luma < 45 ? "太暗" : luma < 85 ? "偏暗" : (luma > 205 || over > 25) ? "过亮" : "合适";
+      L = { luma: r1(luma), pct: Math.round(luma / 2.55), overPct: r1(over), underPct: r1(under), level: level,
+            cls: level === "合适" ? "good" : level === "太暗" ? "bad" : "mid" };
+    } catch (e) { L = null; }
+  }
+  setInterval(measureLight, 500);
+
+  // 曝光参数（部分手机提供）：据此估算环境照度。按 f/1.8 的手机镜头近似：EV100 = log2(N²/t) - log2(ISO/100)，lux ≈ 2.5·2^EV100
+  function exposureInfo() {
+    var t = rawStream && rawStream.getVideoTracks()[0];
+    var st = t && t.getSettings ? t.getSettings() : {};
+    var et = st.exposureTime, iso = st.iso;   // exposureTime 单位：100 微秒（规范约定）
+    var out = { exposureMode: st.exposureMode || null, exposureTime: et != null ? et : null, iso: iso != null ? iso : null };
+    if (et > 0 && iso > 0) {
+      var sec = et / 10000, ev = Math.log2(1.8 * 1.8 / sec) - Math.log2(iso / 100);
+      out.estLux = Math.round(2.5 * Math.pow(2, ev));
+    }
+    return out;
+  }
+
+  function renderHud() {
+    var p = pose(), s = shake();
+    if (p) {
+      // 镜头前只留一句大白话，细节放进设置里的「诊断信息」
+      el.pose.innerHTML = p.mode + " · 偏 <b class='" + cls(p.errDeg) + "'>" + Math.round(p.errDeg) + "°</b>" +
+        (s && s.verdict !== "稳定" ? " · <b class='" + (s.verdict === "轻微" ? "mid" : "bad") + "'>" + s.verdict + "</b>" : "");
+      // 气泡：俯拍/仰拍时按两个倾角偏移；平视时用横滚 + 俯仰
+      var bx, by;
+      if (p.mode === "平视") { bx = p.horizonRollDeg; by = -p.tiltFromLevelDeg; }
+      else { bx = p.rollLeftRightDeg; by = -p.pitchFrontBackDeg; }   // 气泡跑向偏高的一侧，和真实水平仪一致
+      var k = 1.6, lim = 20;
+      bx = Math.max(-lim, Math.min(lim, bx * k)); by = Math.max(-lim, Math.min(lim, by * k));
+      el.bub.style.transform = "translate(" + bx + "px," + by + "px)";
+      el.bub.className = "bub " + (p.errDeg <= 2 ? "good" : p.errDeg > 8 ? "bad" : "");
+    } else if (!el.pose.dataset.fixed) {
+      el.pose.textContent = "姿态：此浏览器未提供重力传感器";
+    }
+    if (L) {
+      var ex = exposureInfo();
+      el.light.innerHTML = "☀ 光线 <b class='" + L.cls + "'>" + L.level + " " + L.pct + "</b>" +
+        (ex.estLux != null ? " <span style='color:#8b97a5'>≈" + ex.estLux + " lx</span>" : S.lux != null ? " <span style='color:#8b97a5'>" + Math.round(S.lux) + " lx</span>" : "") +
+        (torchOn ? " · <b class='mid'>补光中</b>" : "");
+    } else {
+      el.light.textContent = "";
+    }
+    if (el.sheet.classList.contains("on")) renderSensorKv(p, s);
+  }
+  setInterval(renderHud, 150);
+
+  function renderSensorKv(p, s) {
+    var rows = [];
+    function add(k, v) { if (v != null && v !== "") rows.push("<dt>" + k + "</dt><dd>" + v + "</dd>"); }
+    add("版本", OYE_VERSION.indexOf("__") === 0 ? "" : OYE_VERSION);
+    if (p) {
+      add("模式", p.mode); add("偏离垂直/水平", p.errDeg + "°");
+      add("光轴离正下方", p.tiltFromDownDeg + "°");
+      add("前后倾 / 左右倾", p.pitchFrontBackDeg + "° / " + p.rollLeftRightDeg + "°");
+      add("画面旋转", p.horizonRollDeg + "°"); add("罗盘", p.compassDeg != null ? p.compassDeg + "°" : null);
+    }
+    if (S.gravity) add("重力 xyz", [S.gravity.x, S.gravity.y, S.gravity.z].map(function (v) { return v.toFixed(2); }).join(", "));
+    if (s) { add("线加速度峰值", s.linAccMax + " m/s²"); add("角速度峰值", s.rotRateMaxDegS + " °/s"); }
+    var t = rawStream && rawStream.getVideoTracks()[0];
+    if (t) {
+      var st = t.getSettings();
+      add("摄像头", t.label); add("源分辨率", (srcVideo ? srcVideo.videoWidth + "×" + srcVideo.videoHeight : "?") + " @" + r1(st.frameRate) + "fps");
+      add("对焦 / 曝光 / 白平衡", [st.focusMode, st.exposureMode, st.whiteBalanceMode].filter(Boolean).join(" / ") || "未提供");
+      if (st.zoom != null) add("变焦", st.zoom);
+      var ex = exposureInfo();
+      if (ex.iso != null || ex.exposureTime != null) add("感光度 / 曝光时间", (ex.iso != null ? "ISO " + ex.iso : "—") + " / " + (ex.exposureTime != null ? r1(ex.exposureTime / 10) + " ms" : "—"));
+      add("补光灯", torchCap ? (torchOn ? "支持 · 亮" : "支持 · 灭") : "不支持（" + faceName() + "）");
+    }
+    if (L) add("画面亮度", L.luma + "/255 · 过曝 " + L.overPct + "% · 欠曝 " + L.underPct + "%");
+    if (S.battery) add("电量", S.battery.level + "%" + (S.battery.charging ? " 充电中" : ""));
+    var c = navigator.connection;
+    if (c) add("网络", (c.type || "") + " " + (c.effectiveType || "") + (c.downlink ? " " + c.downlink + "Mbps" : "") + (c.rtt != null ? " rtt " + c.rtt + "ms" : ""));
+    el.sensorKv.innerHTML = rows.join("") || "<dt>—</dt><dd>无数据</dd>";
+  }
+
+  // =====================================================================
+  //  摄像头采集与绘制
+  // =====================================================================
+  async function resolveDeviceId() {
+    try {
+      var ds = await navigator.mediaDevices.enumerateDevices();
+      var cams = ds.filter(function (d) { return d.kind === "videoinput"; });
+      var hit = cams.find(function (d) {
+        var caps = d.getCapabilities ? d.getCapabilities() : {};
+        return caps.facingMode && caps.facingMode.indexOf(facing) !== -1;
+      });
+      if (!hit) {
+        var kw = facing === "user" ? "front" : "back";
+        hit = cams.find(function (d) { return (d.label || "").toLowerCase().indexOf(kw) !== -1; });
+      }
+      return hit ? hit.deviceId : null;
+    } catch (e) { return null; }
+  }
+
+  function constraintLevels(deviceId) {
+    var q = QUALITY[quality];
+    function c(w, h, fps, useId) {
+      var v = {};
+      if (useId && deviceId) v.deviceId = { exact: deviceId };
+      v.facingMode = { ideal: facing };
+      if (w) { v.width = { ideal: w }; v.height = { ideal: h }; }
+      if (fps) v.frameRate = { ideal: fps };
+      return { video: v, audio: false };
+    }
+    return [c(q.srcW, q.srcH, q.fps, true), c(960, 540, 20, true), c(q.srcW, q.srcH, q.fps, false), c(0, 0, 0, false)];
+  }
+
+  // 省电：手机可能整天开着摄像头放在桌上。没人碰、没有拍照请求时，预览降到每秒 8 帧，减少发热和耗电；
+  // 拍照取的是摄像头原始画面，不受预览帧率影响。点屏幕、晃动手机（在调角度）或收到请求时恢复正常帧率。
+  var IDLE_FPS = 8, IDLE_AFTER_MS = 15000, lastActive = Date.now();
+  function previewFps(q) {
+    var sh = shake();
+    if (sh && sh.verdict !== "稳定") lastActive = Date.now();
+    return reqBusy || snapBusy || Date.now() - lastActive < IDLE_AFTER_MS ? q.fps : IDLE_FPS;
+  }
+  ["touchstart", "click"].forEach(function (ev) { document.addEventListener(ev, function () { lastActive = Date.now(); }, true); });
+
+  function startDrawing(q) {
+    var canvas = el.preview;
+    canvas.width = q.w; canvas.height = q.h;
+    var ctx = canvas.getContext("2d", { alpha: false });
+    var last = 0;
+    running = true;
+    function draw(ts) {
+      if (!running) return;
+      raf = requestAnimationFrame(draw);
+      if (ts - last < 1000 / previewFps(q)) return;
+      last = ts;
+      var vw = srcVideo.videoWidth, vh = srcVideo.videoHeight;
+      if (!vw || !vh) return;
+      var rot = vw > vh;
+      var scale = rot ? Math.min(canvas.height / vw, canvas.width / vh) : Math.min(canvas.width / vw, canvas.height / vh);
+      var dw = vw * scale, dh = vh * scale;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.save(); ctx.translate(canvas.width / 2, canvas.height / 2);
+      if (rot) ctx.rotate(Math.PI / 2);
+      ctx.drawImage(srcVideo, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    }
+    raf = requestAnimationFrame(draw);
+  }
+
+  async function startCamera(noTorch) {
+    if (running || rawStream) return;
+    var my = ++gen;
+    setStatus("connecting", "打开摄像头…");
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("error", "不安全连接，无法用摄像头");
+      el.pose.innerHTML = "请在电脑上的 Open Your Eyes 里点「＋ 添加机位」，用这台手机扫码，按提示操作";
+      say("当前页面不是安全上下文（isSecureContext=false）。");
+      return;
+    }
+    var deviceId = await resolveDeviceId();
+    if (my !== gen) return;
+    var levels = constraintLevels(deviceId), lastErr = null;
+    for (var i = 0; i < levels.length; i++) {
+      try { rawStream = await navigator.mediaDevices.getUserMedia(levels[i]); break; }
+      catch (e) { lastErr = e; rawStream = null; await new Promise(function (r) { setTimeout(r, 450); }); }
+      if (my !== gen) return;
+    }
+    if (!rawStream) {
+      setStatus("error", "摄像头不可用");
+      say("所有约束均失败：" + (lastErr && lastErr.name) + " " + (lastErr && lastErr.message || ""));
+      cameraHelp(lastErr);
+      return;
+    }
+    el.notice.classList.remove("on");
+    srcVideo = document.createElement("video");
+    srcVideo.muted = true; srcVideo.playsInline = true; srcVideo.autoplay = true;
+    srcVideo.srcObject = rawStream;
+    try { await srcVideo.play(); } catch (e) {}
+    if (!srcVideo.videoWidth) await new Promise(function (r) { srcVideo.onloadedmetadata = r; setTimeout(r, 1200); });
+    if (my !== gen) return;
+    startDrawing(QUALITY[quality]);
+    setStatus("live", "就绪");
+    keepAwake();
+    detectTorch();
+    if (!noTorch && lightMode === "on" && torchCap) setTorch(true);
+    liveReplaceTrack();
+  }
+
+  // 摄像头打不开时告诉用户为什么、该怎么做（同时报给电脑，设置页「最近事件」能看到）
+  var INAPP = /; wv\)|MicroMessenger|QQ\/|MQQBrowser|Weibo|DingTalk|AlipayClient|baiduboxapp/i.test(navigator.userAgent) ||
+              (IOS && /CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent));
+  function cameraHelp(err) {
+    var name = err && err.name, html;
+    report("摄像头打不开：" + (name || "") + " " + (err && err.message || err || "") + (INAPP ? "（内置浏览器）" : ""));
+    if (INAPP) {
+      var inApp = /MicroMessenger|QQ\/|Weibo|DingTalk|AlipayClient|baiduboxapp/i.test(navigator.userAgent);
+      html = "<b>请用" + (IOS ? " Safari " : " Chrome ") + "浏览器打开</b>" + (inApp
+        ? "现在是在其它应用的内置浏览器里，它不让网页用摄像头。点右上角「⋯」选「在浏览器中打开」，或复制链接到" + (IOS ? " Safari" : " Chrome") + "。"
+        : "这个浏览器不让网页使用摄像头（很多手机自带的浏览器都这样）。请复制链接，用 Chrome 打开；没有 Chrome 就在应用商店搜索「Chrome」安装。") +
+        "<br><button id='copyUrl'>复制链接</button>";
+    } else if (name === "NotAllowedError" || name === "SecurityError") {
+      html = "<b>没有摄像头权限</b>点地址栏左边的图标 → 权限 → 把「摄像头」改成允许，然后刷新页面。";
+    } else if (name === "NotReadableError" || name === "AbortError") {
+      html = "<b>摄像头被占用</b>请关掉其它正在用摄像头的应用或浏览器标签页，然后刷新页面。";
+    } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+      html = "<b>找不到摄像头</b>这台设备没有可用的摄像头，或者浏览器拿不到它。";
+    } else {
+      html = "<b>摄像头打不开</b>请刷新页面重试；还不行就重启一下浏览器。";
+    }
+    el.notice.innerHTML = html;
+    el.notice.classList.add("on");
+    var c = document.getElementById("copyUrl");
+    if (c) c.addEventListener("click", function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(location.href) : Promise.reject()).then(function () { c.textContent = "已复制"; })
+        .catch(function () { prompt("长按复制这个链接：", location.href); });
+    });
+    report("摄像头打不开：" + (INAPP ? "在内置浏览器里 " : "") + (name || "") + " " + (err && err.message || ""));
+  }
+
+  function stopCamera() {
+    gen++;
+    running = false;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    if (srcVideo) { srcVideo.srcObject = null; srcVideo = null; }
+    if (rawStream) { rawStream.getTracks().forEach(function (t) { t.stop(); }); rawStream = null; }
+    torchOn = false;   // 轨道停了灯也就灭了
+    setStatus("", "已暂停");
+  }
+
+  async function restartCamera(noTorch) {
+    stopCamera();
+    await new Promise(function (r) { setTimeout(r, 600); });
+    await startCamera(noTorch);
+  }
+
+  // =====================================================================
+  //  补光：后置用手机的手电筒（网页只能控制「常亮」，没有拍照瞬间的闪光）；前置没有灯，用整屏变白补光
+  // =====================================================================
+  var LIGHT_KEY = "t9cam.light";
+  var lightMode = { off: 1, auto: 1, on: 1 }[lsGet(LIGHT_KEY)] ? lsGet(LIGHT_KEY) : "off";   // 默认关：突然亮灯会吓到人
+  var torchCap = false, torchOn = false;
+  var AUTO_DARK_LUMA = 70;   // 「自动」：画面平均亮度低于它就补光
+
+  function videoTrack() { return rawStream && rawStream.getVideoTracks()[0]; }
+
+  function detectTorch() {
+    var t = videoTrack(), caps = {};
+    try { caps = t && t.getCapabilities ? t.getCapabilities() : {}; } catch (e) {}
+    torchCap = facing !== "user" && (caps.torch === true || (Array.isArray(caps.torch) && caps.torch.indexOf(true) !== -1));
+    torchOn = false;
+    syncLightUI();
+  }
+
+  async function setTorch(on) {
+    var t = videoTrack();
+    if (!torchCap || !t) return false;
+    if (on) {
+      try { await t.applyConstraints({ advanced: [{ torch: true }] }); torchOn = true; }
+      catch (e) { report("补光灯打开失败：" + (e && e.message || e)); return false; }
+    } else {
+      if (!torchOn) return true;
+      try { await t.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {}
+      // 部分安卓（实测 Android 10 + Chrome 138）设 torch:false 不生效，灯一直亮着：
+      // 重开一次摄像头才能可靠熄灭（摄像头一释放灯必灭），代价是画面黑一秒左右
+      torchOn = false;
+      await restartCamera(true);
+    }
+    syncLightUI();
+    return true;
+  }
+
+  var LIGHT_NAME = { off: "关", auto: "自动", on: "常亮" };
+  function syncLightUI() {
+    var front = facing === "user", usable = torchCap || front;
+    el.torchBtn.classList.toggle("hide", !usable);
+    el.torchBtn.classList.toggle("on", lightMode !== "off");
+    el.torchBtn.innerHTML = "⚡" + (lightMode === "auto" ? "<small>A</small>" : "");
+    Array.prototype.forEach.call(el.lseg.children, function (b) { b.classList.toggle("active", b.dataset.l === lightMode); });
+    el.lightNote.textContent = front
+      ? "前置摄像头没有补光灯，改用屏幕补光：拍照瞬间整屏变白照亮物体（只对近处有效）。「常亮」在前置时等同于每次拍照都补光。"
+      : torchCap ? "后置补光灯可用。自动：光线太暗时，拍照前打开、拍完关掉；常亮：一直开着。"
+      : "这台手机的后置摄像头不支持网页控制补光灯，补光设置暂时不起作用。";
+  }
+
+  async function setLightMode(m, quiet) {
+    lightMode = m; lsSet(LIGHT_KEY, m);
+    if (torchCap) await setTorch(m === "on");
+    syncLightUI();
+    if (!quiet) toast("补光：" + LIGHT_NAME[m]);
+  }
+
+  // 拍照前按需补光；返回 { info, restore }，restore 可重复调用
+  async function prepareLight(override) {
+    var mode = { off: 1, auto: 1, on: 1 }[override] ? override : lightMode;
+    var info = { mode: mode, used: "none", lumaBefore: L ? L.luma : null };
+    var restore = function () {};
+    var want = mode === "on" || (mode === "auto" && L != null && L.luma < AUTO_DARK_LUMA);
+    if (facing === "user") {
+      if (want) {
+        el.screenFill.classList.add("on"); info.used = "screen";
+        await sleep(450);   // 等摄像头按新的亮度调好曝光
+        restore = function () { el.screenFill.classList.remove("on"); };
+      }
+    } else if (torchCap) {
+      var was = torchOn;
+      if (want && !was && await setTorch(true)) {
+        info.used = "torch"; await sleep(700);
+        restore = function () { if (lightMode !== "on") return setTorch(false); };
+      } else if (want && was) {
+        info.used = "torch";
+      } else if (!want && was && await setTorch(false)) {   // Claude 明确要求这张不补光
+        await sleep(600);
+        restore = function () { return setTorch(true); };
+      }
+    } else if (want) {
+      info.used = "unavailable";
+    }
+    var done = false;
+    return { info: info, restore: async function () { if (done) return; done = true; try { await restore(); } catch (e) {} } };
+  }
+
+  // 看门狗：iOS 在锁屏、来电、Siri、其它应用占用音频、页面再申请麦克风等情况下会「中断」摄像头——
+  // 视频轨道被静音或结束，但流对象还在，画面就一直黑着。发现画面停了几秒就自动重开摄像头。
+  var dog = { t: -1, still: 0, tries: [] };
+  setInterval(function () {
+    if (!running || !rawStream || !srcVideo || snapBusy || document.visibilityState !== "visible") { dog.still = 0; return; }
+    var tr = rawStream.getVideoTracks()[0];
+    var dead = !tr || tr.readyState === "ended";
+    var t = srcVideo.currentTime;
+    dog.still = (tr && tr.muted) || t === dog.t || srcVideo.paused ? dog.still + 2 : 0;
+    dog.t = t;
+    if (dead || dog.still >= 6) {
+      dog.still = 0; dog.t = -1;
+      var now = Date.now();
+      dog.tries = dog.tries.filter(function (x) { return now - x < 60000; });
+      if (dog.tries.length >= 3) {   // 一分钟内重开 3 次还不行，多半是摄像头被别的应用占着，别再死循环
+        say("摄像头被占用或被系统停用：请关掉其它用摄像头的应用，再点一下画面刷新");
+        report("看门狗放弃：一分钟内重开 3 次仍不行");
+        return;
+      }
+      dog.tries.push(now);
+      console.log("摄像头画面中断，自动重开", dead ? "ended" : "stalled");
+      report("看门狗重开摄像头：" + (dead ? "轨道结束" : (tr && tr.muted ? "轨道静音" : "画面停住")) + " t=" + t);
+      say("摄像头被系统中断，正在自动恢复…");
+      restartCamera().then(function () { setTimeout(function () { say(""); }, 1500); });
+    }
+  }, 2000);
+
+  // =====================================================================
+  //  拍照：原始分辨率帧 + 拍摄瞬间的全部传感器
+  // =====================================================================
+  function grabFrame() {
+    if (!srcVideo || !srcVideo.videoWidth) return null;
+    var vw = srcVideo.videoWidth, vh = srcVideo.videoHeight, rot = vw > vh;
+    var c = document.createElement("canvas");
+    c.width = rot ? vh : vw; c.height = rot ? vw : vh;
+    var ctx = c.getContext("2d", { alpha: false });
+    ctx.translate(c.width / 2, c.height / 2);
+    if (rot) ctx.rotate(Math.PI / 2);
+    ctx.drawImage(srcVideo, -vw / 2, -vh / 2, vw, vh);
+    return c;
+  }
+
+  // 画面质量：亮度、过曝/欠曝比例、清晰度（拉普拉斯方差，越大越清晰）
+  function imageStats(c) {
+    var w = 270, h = Math.round(c.height * w / c.width);
+    var t = document.createElement("canvas"); t.width = w; t.height = h;
+    var x = t.getContext("2d"); x.drawImage(c, 0, 0, w, h);
+    var d = x.getImageData(0, 0, w, h).data, n = w * h, gray = new Float32Array(n);
+    var sum = 0, hi = 0, lo = 0;
+    for (var i = 0, j = 0; i < n; i++, j += 4) {
+      var v = 0.299 * d[j] + 0.587 * d[j + 1] + 0.114 * d[j + 2];
+      gray[i] = v; sum += v; if (v > 245) hi++; if (v < 10) lo++;
+    }
+    var m = 0, m2 = 0, cnt = 0;
+    for (var yy = 1; yy < h - 1; yy++) for (var xx = 1; xx < w - 1; xx++) {
+      var k = yy * w + xx;
+      var lap = 4 * gray[k] - gray[k - 1] - gray[k + 1] - gray[k - w] - gray[k + w];
+      m += lap; m2 += lap * lap; cnt++;
+    }
+    m /= cnt;
+    return { meanLuma: r1(sum / n), overexposedPct: r1(hi / n * 100), underexposedPct: r1(lo / n * 100),
+             sharpness: Math.round(m2 / cnt - m * m) };
+  }
+
+  function cameraInfo() {
+    var t = rawStream && rawStream.getVideoTracks()[0];
+    if (!t) return null;
+    var caps = {};
+    try { caps = t.getCapabilities ? t.getCapabilities() : {}; } catch (e) {}
+    return { label: t.label, facing: facing, settings: t.getSettings ? t.getSettings() : null, capabilities: caps,
+             displaySize: srcVideo ? srcVideo.videoWidth + "x" + srcVideo.videoHeight : null };
+  }
+
+  function collectMeta(c) {
+    var c2 = navigator.connection;
+    return {
+      clientTime: new Date().toISOString(),
+      page: { origin: location.origin, secure: window.isSecureContext },
+      pose: pose(),
+      stability: shake(),
+      raw: { gravity: S.gravity, linearAcceleration: S.linAcc, rotationRate: S.rotRate,
+             orientation: S.orient, orientationAbsolute: S.orientAbs, motionIntervalMs: S.motionInterval },
+      ambientLux: S.lux,
+      camera: cameraInfo(),
+      image: Object.assign({ width: c.width, height: c.height }, imageStats(c)),
+      battery: S.battery,
+      network: c2 ? { type: c2.type, effectiveType: c2.effectiveType, downlinkMbps: c2.downlink, rttMs: c2.rtt } : null,
+      screen: { w: screen.width, h: screen.height, dpr: devicePixelRatio, orientation: screen.orientation && screen.orientation.type },
+      userAgent: navigator.userAgent
+    };
+  }
+
+  function snapUrl() {
+    // HTTPS 页面（局域网直连）走同源；HTTP 页面不能向 https 之外的混合内容发请求以外，localhost 打开时走 LAN 直连 Mac
+    if (location.protocol === "https:" || location.hostname !== "localhost") return "/api/snap";
+    return (cfg && cfg.lanIp && cfg.lanIp !== "127.0.0.1")
+      ? "http://" + cfg.lanIp + ":" + (location.port || "39757") + "/api/snap" : "/api/snap";
+  }
+
+  function blobToB64(blob) {
+    return new Promise(function (res, rej) {
+      var r = new FileReader();
+      r.onload = function () { res(String(r.result).split(",")[1]); };
+      r.onerror = rej; r.readAsDataURL(blob);
+    });
+  }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  // 缩小到长边 maxSide（不放大），用于连拍帧和方向比对
+  function scaled(src, maxSide) {
+    var k = Math.min(1, maxSide / Math.max(src.width, src.height));
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(src.width * k)); c.height = Math.max(1, Math.round(src.height * k));
+    c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  function rotated(bmp, dir) {   // dir: 0 不转，1 顺时针 90°，-1 逆时针 90°
+    var c = document.createElement("canvas");
+    c.width = dir ? bmp.height : bmp.width; c.height = dir ? bmp.width : bmp.height;
+    var ctx = c.getContext("2d", { alpha: false });
+    ctx.translate(c.width / 2, c.height / 2);
+    if (dir) ctx.rotate(dir * Math.PI / 2);
+    ctx.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+    return c;
+  }
+
+  function grayDiff(a, b) {   // 两张小图的平均灰度差，越小越像
+    var w = 24, h = 40;
+    function g(src) {
+      var t = document.createElement("canvas"); t.width = w; t.height = h;
+      var x = t.getContext("2d"); x.drawImage(src, 0, 0, w, h);
+      var d = x.getImageData(0, 0, w, h).data, out = new Float32Array(w * h);
+      for (var i = 0; i < out.length; i++) out[i] = d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2];
+      return out;
+    }
+    var p = g(a), q = g(b), s = 0;
+    for (var i = 0; i < p.length; i++) s += Math.abs(p[i] - q[i]);
+    return s / p.length;
+  }
+
+  // 全尺寸拍照：用浏览器拍照接口拿摄像头最高分辨率。不同手机原图的旋转方向不一致，
+  // 所以拿同一时刻的预览帧（方向已知正确）做参照，自动选对方向。不支持或失败时返回 null，退回预览帧。
+  var lastTiming = null;   // 各步骤耗时（毫秒），只写进照片数据文件，用于调优
+  // 有的手机（实测新版 iOS Safari）有拍照接口但每次都失败，还可能把摄像头弄断；失败过一次就不再用，直接用预览帧
+  var photoApiBroken = false;
+  async function fullPhoto(ref) {
+    var track = rawStream && rawStream.getVideoTracks()[0];
+    if (photoApiBroken || !track || typeof ImageCapture === "undefined" || !window.createImageBitmap) return null;
+    var tm = {}, t = performance.now();
+    function lap(k) { var n = performance.now(); tm[k] = Math.round(n - t); t = n; }
+    try {
+      var ic = new ImageCapture(track);
+      var opts = {};
+      try {
+        var caps = await Promise.race([ic.getPhotoCapabilities(), sleep(2000).then(function () { throw new Error("取能力超时"); })]);
+        if (caps.imageWidth && caps.imageWidth.max) { opts.imageWidth = caps.imageWidth.max; opts.imageHeight = caps.imageHeight.max; }
+      } catch (e) {}
+      lap("caps");
+      var blob = await Promise.race([ic.takePhoto(opts), sleep(8000).then(function () { throw new Error("拍照超时"); })])
+        .catch(function (e) { photoApiBroken = true; throw e; });
+      lap("takePhoto");
+      var bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+      lap("decode");
+      var dirs = (bmp.width > bmp.height) === (ref.width > ref.height) ? [0] : [1, -1];
+      var best = null, bestD = Infinity;
+      dirs.forEach(function (d) {
+        var c = rotated(bmp, d), diff = grayDiff(scaled(c, 64), ref);
+        if (diff < bestD) { bestD = diff; best = c; }
+      });
+      if (bmp.close) bmp.close();
+      lap("rotate");
+      lastTiming = tm;
+      return best;
+    } catch (e) {
+      tm.error = String(e && e.message || e);
+      lastTiming = tm;
+      return null;
+    }
+  }
+
+  var snapBusy = false;
+  // 画面中央的提示层（Claude 请求时由 pollLoop 打开）：拍摄中 → 已发送 / 发送失败
+  function showStatus(icon, text) {
+    el.countNum.textContent = icon;
+    el.count.querySelector("small").textContent = text;
+  }
+
+  // 只拍 Claude 请求的照片（用户在电脑上「允许」即同意拍照）；手机上没有快门，不主动拍
+  async function snap(requestId, light) {
+    if (snapBusy) { report("拍照跳过：上一张还在处理"); return; }
+    if (!srcVideo || !srcVideo.videoWidth) { showStatus("✕", "摄像头还没就绪"); report("拍照失败：摄像头还没就绪"); return; }
+    snapBusy = true;
+    var lp = await prepareLight(light);
+    try {
+      var c0 = grabFrame();
+      if (!c0) throw new Error("摄像头还没就绪");
+      var meta = collectMeta(c0);         // 先取传感器，保证与拍摄同一瞬间
+      meta.trigger = "request";
+      meta.requestId = requestId;
+      meta.phoneId = phoneId;
+      meta.light = lp.info;
+      if (lp.info.used !== "screen") { el.flash.classList.add("on"); setTimeout(function () { el.flash.classList.remove("on"); }, 60); }
+      lastTiming = null;
+      var c = (await fullPhoto(c0)) || c0;
+      var tm = lastTiming || {}, t = performance.now();
+      meta.image = Object.assign({ width: c.width, height: c.height, source: c === c0 ? "preview" : "photo" }, imageStats(c));
+      tm.stats = Math.round(performance.now() - t); t = performance.now();
+      showStatus("📤", "发送中…");
+      var blob = await new Promise(function (r) { c.toBlob(r, "image/jpeg", 0.92); });
+      tm.encode = Math.round(performance.now() - t); t = performance.now();
+      var b64 = await blobToB64(blob);
+      tm.base64 = Math.round(performance.now() - t); t = performance.now();
+      meta.timing = tm;
+      var r = await fetch(snapUrl(), { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meta: meta, jpegBase64: b64 }) });
+      tm.upload = Math.round(performance.now() - t);
+      report("拍照完成 " + c.width + "x" + c.height + " 补光=" + lp.info.used + " 耗时 " + JSON.stringify(tm));
+      var j = await r.json();
+      if (!j.ok) throw new Error(j.error || r.status);
+      showStatus("✓", "已发送");
+    } catch (e) {
+      showStatus("✕", "发送失败");
+      say("拍照发送失败：" + (e && e.message ? e.message : e));
+      report("拍照发送失败：" + (e && e.message ? e.message : e));
+    }
+    await lp.restore();   // 照片发出去之后再关灯（关灯可能要重开摄像头），不拖慢交付
+    snapBusy = false;
+  }
+
+  // 短片：在 seconds 秒内均匀取 frames 帧（先全部抓取再统一编码，保证时间间隔准确）
+  var CLIP_SIDE = 1280;
+  async function clip(requestId, seconds, frames, light) {
+    if (snapBusy) return;
+    if (!srcVideo || !srcVideo.videoWidth) { showStatus("✕", "摄像头还没就绪"); report("连拍失败：摄像头还没就绪"); return; }
+    snapBusy = true;
+    var lp = await prepareLight(light);
+    try {
+      var first = grabFrame();
+      if (!first) throw new Error("摄像头还没就绪");
+      var meta = collectMeta(first);
+      meta.trigger = "request"; meta.requestId = requestId; meta.phoneId = phoneId; meta.clipSeconds = seconds;
+      meta.light = lp.info;
+      var shots = [scaled(first, CLIP_SIDE)], gap = seconds * 1000 / (frames - 1), t0 = performance.now();
+      showStatus("🎞", "连拍中…");
+      for (var i = 1; i < frames; i++) {
+        var wait = t0 + i * gap - performance.now();
+        if (wait > 0) await sleep(wait);
+        var f = grabFrame();
+        if (f) shots.push(scaled(f, CLIP_SIDE));
+      }
+      meta.image = { width: shots[0].width, height: shots[0].height, source: "preview" };
+      showStatus("📤", "发送中…");
+      var list = [];
+      for (var k = 0; k < shots.length; k++) {
+        var blob = await new Promise(function (r) { shots[k].toBlob(r, "image/jpeg", 0.85); });
+        list.push(await blobToB64(blob));
+      }
+      var r = await fetch(snapUrl(), { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meta: meta, frames: list }) });
+      var j = await r.json();
+      if (!j.ok) throw new Error(j.error || r.status);
+      showStatus("✓", "已发送 " + list.length + " 帧");
+    } catch (e) {
+      showStatus("✕", "发送失败");
+      say("连拍发送失败：" + (e && e.message ? e.message : e));
+      report("连拍发送失败：" + (e && e.message ? e.message : e));
+    }
+    await lp.restore();
+    snapBusy = false;
+  }
+
+  // =====================================================================
+  //  UI
+  // =====================================================================
+  // 屏幕常亮：系统可能随时收回（切后台、省电模式等），收回后只要页面还在前台就重新申请，避免手机自己锁屏断线
+  async function keepAwake() {
+    if (!("wakeLock" in navigator) || document.visibilityState !== "visible" || (wakeLock && !wakeLock.released)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", function () { setTimeout(keepAwake, 1000); });
+    } catch (e) {}
+  }
+
+  function syncUI() {
+    el.title.textContent = (shownName ? shownName + " · " : "") + faceName();
+    if (document.activeElement !== el.phoneName) el.phoneName.value = phoneName || shownName;
+    el.phoneName.placeholder = shownName || "1 号机";
+    el.camFront.classList.toggle("active", facing === "user");
+    el.camBack.classList.toggle("active", facing === "environment");
+    Array.prototype.forEach.call(el.qseg.children, function (b) { b.classList.toggle("active", b.dataset.q === quality); });
+    el.preview.style.transform = el.mirror.checked ? "scaleX(-1)" : "none";
+    el.grid.classList.toggle("on", el.gridT.checked);
+    syncLightUI();
+  }
+
+  function selectFacing(next) {
+    if (next === facing) return;
+    facing = next; lsSet(FACE_KEY, facing);
+    el.mirror.checked = facing === "user";
+    syncUI(); toast("切到" + faceName() + "摄像头"); restartCamera();
+  }
+
+  function openSheet(on) { el.sheet.classList.toggle("on", on); el.mask.classList.toggle("on", on); }
+
+  // 提示音：Claude 请求拍照时响一声。iOS 等要用户点过屏幕后声音才能播放
+  var actx = null;
+  function beep(freq, ms) {
+    try {
+      var c = actx; if (!c || c.state !== "running") return;
+      var o = c.createOscillator(), g = c.createGain();
+      o.frequency.value = freq; g.gain.value = 0.15;
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + ms / 1000);
+    } catch (e) {}
+  }
+  document.addEventListener("click", function () {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!actx && AC) actx = new AC();
+      if (actx && actx.state === "suspended") actx.resume().catch(function () {});
+    } catch (e) {}
+  }, true);
+
+  // =====================================================================
+  //  Claude 请求拍照：电脑上「允许」后，手机领取请求并立即拍，照片交回发起请求的会话
+  // =====================================================================
+  // 本机编号：第一次打开时生成并保存在手机上；名字（如「俯拍」）可在设置里改，服务端负责默认编号「N 号机」
+  var PHONE_ID_KEY = "t9cam.phoneId", PHONE_NAME_KEY = "t9cam.phoneName";
+  var phoneId = lsGet(PHONE_ID_KEY);
+  if (!phoneId || !/^[A-Za-z0-9]{6,32}$/.test(phoneId)) {
+    phoneId = "p"; for (var pi = 0; pi < 11; pi++) phoneId += "abcdefghijkmnpqrstuvwxyz23456789".charAt(Math.floor(Math.random() * 32));
+    lsSet(PHONE_ID_KEY, phoneId);
+  }
+  // 名字以电脑上的为准（设置页也能改）；手机上点「保存」只是发一次改名请求，电脑确认后就清掉
+  var phoneName = lsGet(PHONE_NAME_KEY) || "";
+  var pageId = Math.random().toString(36).slice(2, 7);   // 每次打开页面不同，用来发现同一台手机开了多个页面   // 空 = 用服务端分配的默认名字
+  var shownName = "";
+
+  var reqBusy = false;
+  var connFails = 0;
+  var BUILD = "__T9_BUILD__";   // 电脑发页面时换成版本指纹
+  var OYE_VERSION = "__T9_VERSION__";   // 电脑端版本（网页版拍照页跟着电脑端走）
+  // 电脑上有新版页面就自动刷新（不在拍照、不在预览时；一分钟最多一次，防止反复刷新）
+  function maybeUpdate(latest) {
+    if (!latest || !/^[0-9a-f]{10}$/.test(BUILD) || latest === BUILD) return false;
+    if (reqBusy || snapBusy || Object.keys(LIVE || {}).length) return false;
+    var last = 0;
+    try { last = +(sessionStorage.getItem("t9.reloadAt") || 0); } catch (e) {}
+    if (Date.now() - last < 60000) return false;
+    try { sessionStorage.setItem("t9.reloadAt", String(Date.now())); } catch (e) {}
+    report("拍照页有新版本，自动刷新");
+    setTimeout(function () { location.reload(); }, 300);
+    return true;
+  }
+  function setConn(ok) {
+    if (ok && pendingShown) return;
+    connFails = ok ? 0 : connFails + 1;
+    if (ok) { el.conn.textContent = "已连接电脑"; el.conn.className = "conn on";
+      el.guide.textContent = "✓ 放着就行：对 AI 说「睁眼」，它会先问你，你允许后自动拍"; el.guide.className = "line2 guide ok"; }
+    else if (connFails >= 2) { el.conn.textContent = "未连接电脑"; el.conn.className = "conn off";   // 偶尔一次失败不报警
+      el.guide.textContent = finding ? "电脑的地址可能变了，正在同一 Wi-Fi 里找它…"
+        : "连不上电脑：确认电脑上的 Open Your Eyes 开着，手机和电脑连的是同一个 Wi-Fi"; el.guide.className = "line2 guide bad"; }
+    if (!ok && connFails >= 8) findComputer();
+  }
+
+  // 电脑的局域网地址变了（换了路由器、重新分配了地址）：在同一网段里找同一台电脑（认它的根证书指纹），
+  // 找到就带着配对密钥和手机编号搬过去，不用重新扫码。一分钟最多找一次。
+  var finding = false, findAt = 0;
+  async function findComputer() {
+    var ca = lsGet("t9cam.ca"), key = lsGet(PAIR_KEY);
+    var m = /^(\d+\.\d+\.\d+)\.(\d+)$/.exec(location.hostname);
+    if (finding || !ca || !key || !m || Date.now() - findAt < 60000 || reqBusy || snapBusy) return;
+    finding = true; findAt = Date.now(); report("连不上电脑，在同一网段里找它");
+    var me = +m[2], port = location.port || "443", hosts = [];
+    for (var d = 1; d < 255; d++) { [me + d, me - d].forEach(function (n) { if (n > 0 && n < 255) hosts.push(m[1] + "." + n); }); }
+    var found = null, i = 0;
+    async function probe(h) {
+      var ctl = window.AbortController ? new AbortController() : null;
+      var t = setTimeout(function () { if (ctl) ctl.abort(); }, 1500);
+      try {
+        var j = await (await fetch("https://" + h + ":" + port + "/config.json", { cache: "no-store", signal: ctl && ctl.signal })).json();
+        if (j && j.caSha256 === ca) found = found || h;
+      } catch (e) {} finally { clearTimeout(t); }
+    }
+    async function worker() { while (!found && i < hosts.length) await probe(hosts[i++]); }
+    var ws = []; for (var k = 0; k < 24; k++) ws.push(worker());
+    await Promise.all(ws);
+    finding = false;
+    if (found && !reqBusy && !snapBusy) {
+      report("找到电脑的新地址 " + found);
+      location.replace("https://" + found + ":" + port + "/#k=" + encodeURIComponent(key) + "&id=" + encodeURIComponent(phoneId || ""));
+    }
+  }
+  var pendingShown = false;
+  function showPending(on) {
+    if (on === pendingShown) return;
+    pendingShown = on;
+    if (on) { el.conn.textContent = "等电脑允许"; el.conn.className = "conn off";
+      say("这台手机还没加入：请在电脑上打开 Open Your Eyes 设置页，点这台手机下面的「允许」。");
+      el.guide.textContent = "等电脑允许：在电脑的 Open Your Eyes 里点这台手机下面的「允许」"; el.guide.className = "line2 guide bad"; }
+    else say("");
+  }
+  function apiBase() { return snapUrl().replace(/\/api\/snap$/, ""); }
+  // 长轮询：连接挂在电脑上，Claude 一请求就同时唤醒所有手机，机位之间只差零点几秒
+  async function pollLoop() {
+    while (true) {
+      // 只有真正能马上拍的时候才领取请求：页面在前台、摄像头就绪、且没有正在进行的拍摄
+      // （否则会领走请求却不拍，要等服务端超时后才能重新领取）
+      // 具体状态：hidden 拍照页切到后台（锁屏 / 切了应用）；camera 摄像头启动中；busy 正在拍；ready 待命
+      var state = document.visibilityState !== "visible" ? "hidden"
+                : !(srcVideo && srcVideo.videoWidth) ? "camera"
+                : reqBusy || snapBusy ? "busy" : "ready";
+      var vis = state === "ready";
+      var t0 = Date.now();
+      try {
+        var r = await fetch(apiBase() + "/api/phone/poll?vis=" + (vis ? 1 : 0) + "&state=" + state + "&live=" + liveHave() + "&hold=3&id=" + encodeURIComponent(phoneId) +
+          "&name=" + encodeURIComponent(phoneName) + "&page=" + pageId + "&facing=" + facing + "&torch=" + (torchCap ? 1 : 0),
+          { cache: "no-store" });
+        var j = await r.json();
+        setConn(true);
+        if (j.id) phoneId = j.id;
+        if (j.moveTo && !reqBusy && !snapBusy && !liveHave()) {   // 电脑换了新端口：带着身份搬过去
+          report("拍照页搬到新端口"); location.replace(j.moveTo); return;
+        }
+        showPending(!!j.pending);
+        if (j.pending) { await sleep(2000); continue; }
+        if (maybeUpdate(j.build)) return;
+        if (j.coverReq != null) {   // 电脑设置页点了「刷新画面」
+          if (cover.req !== null && j.coverReq > cover.req) cover.force = true;
+          cover.req = j.coverReq;
+        }
+        if (j.live) liveSync(j.live);
+        if (phoneName && j.name === phoneName) { phoneName = ""; lsSet(PHONE_NAME_KEY, ""); }
+        if (j.name && j.name !== shownName) { shownName = j.name; syncUI(); }
+        if (j.request && vis && !reqBusy && !snapBusy) {
+          reqBusy = true;
+          el.countNum.textContent = "📷";
+          el.count.querySelector("small").textContent = "AI 想看：" + (j.request.what || "画面") +
+            (j.request.phones > 1 ? "（" + j.request.phones + " 台同时拍）" : "");
+          el.count.classList.add("on");
+          beep(1320, 150);
+          lastActive = Date.now();
+          if (j.request.kind === "clip") await clip(j.request.id, j.request.seconds || 2, j.request.frames || 4, j.request.light);
+          else await snap(j.request.id, j.request.light);
+          reqBusy = false;
+          lastActive = Date.now();
+          setTimeout(function () { el.count.classList.remove("on"); }, 1400);
+          continue;
+        }
+      } catch (e) {
+        if (!reqBusy) setConn(false);
+        if (reqBusy) { reqBusy = false; report("处理请求出错：" + (e && e.message ? e.message : e)); }
+        /* 否则多半是电脑暂时连不上，稍后再试 */
+      }
+      // 服务端立刻返回（页面在后台 / 出错）时别空转：至少隔 1 秒
+      var spent = Date.now() - t0;
+      if (spent < 1000) await sleep(1000 - spent);
+    }
+  }
+  pollLoop();
+
+  // =====================================================================
+  //  封面：在线时每分钟发一张小图（长边 360），只用来在电脑设置页显示「这台手机在线、现在对着哪儿」。
+  //  不进照片库，Claude 拿不到。挪动手机、换了摄像头会提前更新；拍照、实时取景时不发。
+  // =====================================================================
+  var cover = { at: 0, facing: null, pose: null, since: 0, busy: false, force: false, req: null };
+  function coverMoved(p) {
+    if (!cover.at || cover.facing !== facing) return true;
+    if (!p || !cover.pose) return false;
+    var dr = Math.abs(((p.horizonRollDeg - cover.pose.r) % 360 + 540) % 360 - 180);
+    return Math.abs(p.tiltFromDownDeg - cover.pose.t) > 12 || (p.mode === "平视" && dr > 20);
+  }
+  setInterval(async function () {
+    var now = Date.now(), s = shake(), p = pose();
+    var ready = document.visibilityState === "visible" && srcVideo && srcVideo.videoWidth && running &&
+                !reqBusy && !snapBusy && !Object.keys(LIVE).length;
+    if (!ready) { cover.since = 0; return; }
+    if (cover.busy) return;
+    if (!cover.force) {   // 电脑上点了「刷新画面」就马上截，不等放稳、不管多久前截过
+      if (s && s.verdict !== "稳定") { cover.since = 0; return; }
+      if (!cover.since) cover.since = now;
+      if (now - cover.since < 2500) return;
+      if (!coverMoved(p) && now - cover.at < 60000) return;
+      if (cover.at && now - cover.at < 20000) return;   // 别太频繁
+    }
+    cover.busy = true;
+    try {
+      var c = grabFrame(); if (!c) return;
+      var blob = await new Promise(function (r) { scaled(c, 360).toBlob(r, "image/jpeg", 0.6); });
+      var r = await fetch(apiBase() + "/api/phone/cover", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: phoneId, jpegBase64: await blobToB64(blob) }) });
+      if (r.ok) { cover.force = false; cover.at = Date.now(); cover.facing = facing; cover.pose = p ? { t: p.tiltFromDownDeg, r: p.horizonRollDeg } : null; }
+      else cover.since = Date.now();   // 还没登记上：等一会儿再试
+    } catch (e) { cover.since = Date.now(); }
+    finally { cover.busy = false; }
+  }, 1000);
+
+  // =====================================================================
+  //  取景：电脑设置页点「取景」时才发送（视频走局域网直连电脑浏览器，不经过电脑上的服务）
+  //  电脑那边关掉、超时、或本页切到后台，会话就会从轮询结果里消失，这里随即停止发送
+  // =====================================================================
+  var LIVE = {};   // sid -> { pc, sender, q }
+  var LIVE_Q = { low: { h: 480, bps: 700000, fps: 12 }, high: { h: 720, bps: 1600000, fps: 15 } };
+  function liveHave() { return Object.keys(LIVE).sort().join(","); }
+  function liveEnc(q) {
+    var t = videoTrack(), st = t && t.getSettings ? t.getSettings() : {};
+    var short = Math.min(st.width || 1080, st.height || 1920) || 1080, c = LIVE_Q[q] || LIVE_Q.low;
+    return { scaleResolutionDownBy: Math.max(1, short / c.h), maxBitrate: c.bps, maxFramerate: c.fps };
+  }
+  async function liveApplyQ(e, q) {
+    e.q = q;
+    try {
+      var prm = e.sender.getParameters();
+      if (!prm.encodings || !prm.encodings.length) prm.encodings = [{}];
+      Object.assign(prm.encodings[0], liveEnc(q));
+      await e.sender.setParameters(prm);
+    } catch (err) { /* 协商完成前可能改不了，之后会再按 q 设置 */ }
+  }
+  function iceDone(pc, ms) {
+    return new Promise(function (r) {
+      if (pc.iceGatheringState === "complete") return r();
+      var to = setTimeout(r, ms);
+      pc.addEventListener("icegatheringstatechange", function () { if (pc.iceGatheringState === "complete") { clearTimeout(to); r(); } });
+    });
+  }
+  // 每一步都限时，卡住时报告卡在哪一步（实测个别安卓会在建立连接时静默卡住）
+  function step(name, p, ms) {
+    return Promise.race([p, sleep(ms || 8000).then(function () { throw new Error("卡在「" + name + "」超过 " + ((ms || 8000) / 1000) + " 秒"); })]);
+  }
+  async function liveStart(sid, q) {
+    var t = videoTrack();
+    if (!t) { report("取景：摄像头还没就绪，稍后重试"); return; }
+    if (!window.RTCPeerConnection) { report("取景：这个浏览器不支持实时视频"); return; }
+    report("取景：收到电脑请求，开始连接（" + (q === "high" ? "720p" : "480p") + "）");
+    var pc = new RTCPeerConnection({ iceServers: [] });   // 同一局域网直连，不需要任何外部服务器
+    var e = LIVE[sid] = { pc: pc, sender: null, q: q };
+    var where = "准备";
+    pc.addEventListener("connectionstatechange", function () {
+      if (pc.connectionState === "failed") report("取景：直连失败（手机和电脑之间的网络不通）");
+    });
+    try {
+      try { t.contentHint = "detail"; } catch (x) {}       // 对准细节：清晰度优先于流畅度
+      where = "添加画面";
+      var tr;
+      try { tr = pc.addTransceiver(t, { direction: "sendonly", streams: [rawStream], sendEncodings: [liveEnc(q)] }); }
+      catch (x) { tr = pc.addTransceiver(t, { direction: "sendonly", streams: [rawStream] }); }   // 个别浏览器不认编码参数
+      e.sender = tr.sender;
+      where = "生成连接邀请";
+      var offer = await step(where, pc.createOffer());
+      where = "设置本地连接";
+      await step(where, pc.setLocalDescription(offer));
+      where = "收集本机地址";
+      await iceDone(pc, 2500);
+      where = "发送连接邀请";
+      await step(where, fetch(apiBase() + "/api/live/offer", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sid: sid, phone: phoneId, sdp: pc.localDescription.sdp }) }));
+      where = "等电脑应答";
+      for (var i = 0; i < 4 && LIVE[sid] === e; i++) {
+        var j = await step(where, fetch(apiBase() + "/api/live/answer?sid=" + sid + "&wait=10", { cache: "no-store" }).then(function (r) { return r.json(); }), 15000);
+        if (j.answer) {
+          where = "应用电脑应答";
+          await step(where, pc.setRemoteDescription({ type: "answer", sdp: j.answer }));
+          await liveApplyQ(e, e.q);
+          report("取景：连接信息交换完成");
+          return;
+        }
+        if (j.state === "ended") return;
+      }
+    } catch (err) { report("取景失败（" + where + "）：" + (err && err.message || err)); }
+  }
+  function liveStop(sid) {
+    var e = LIVE[sid];
+    if (!e) return;
+    delete LIVE[sid];
+    try { e.pc.close(); } catch (x) {}
+  }
+  function liveSync(list) {
+    var want = {};
+    (list || []).forEach(function (x) { want[x.sid] = x.q; });
+    Object.keys(LIVE).forEach(function (sid) { if (!(sid in want)) liveStop(sid); });
+    Object.keys(want).forEach(function (sid) {
+      if (!LIVE[sid]) liveStart(sid, want[sid]);
+      else if (LIVE[sid].q !== want[sid]) liveApplyQ(LIVE[sid], want[sid]);
+    });
+  }
+  // 摄像头重开（切镜头、关补光灯、画面卡住自动恢复）后，把新的画面接到正在进行的预览上
+  function liveReplaceTrack() {
+    var t = videoTrack();
+    if (!t) return;
+    Object.keys(LIVE).forEach(function (sid) {
+      var e = LIVE[sid];
+      if (e.sender) e.sender.replaceTrack(t).then(function () { return liveApplyQ(e, e.q); }).catch(function () {});
+    });
+  }
+  setTimeout(function () {
+    var t = videoTrack(), st = t && t.getSettings ? t.getSettings() : {};
+    report("页面打开 page=" + pageId + " 镜头=" + faceName() + " 补光灯=" + (torchCap ? "有" : "无") +
+      " 曝光参数=" + (st.iso != null || st.exposureTime != null ? "有" : "无") + " " + navigator.userAgent.slice(0, 90));
+  }, 4000);
+
+  // iOS 13+：读取陀螺仪/重力前必须由用户手势触发授权。首次点击页面任意处时申请一次。
+  var motionAsked = false;
+  function askMotion() {
+    if (motionAsked) return;
+    motionAsked = true;
+    var req = [];
+    if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") req.push(DeviceMotionEvent.requestPermission());
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") req.push(DeviceOrientationEvent.requestPermission());
+    if (!req.length) return;
+    Promise.all(req).then(function (r) {
+      delete el.pose.dataset.fixed;
+      toast(r.every(function (x) { return x === "granted"; }) ? "姿态传感器已授权" : "姿态传感器未授权，照片将不含角度数据");
+    }).catch(function (e) { toast("姿态授权失败：" + e.message); });
+  }
+  document.addEventListener("click", askMotion, true);
+  if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === "function") {
+    el.pose.textContent = "姿态：点一下屏幕授权传感器";
+    el.pose.dataset.fixed = "1";
+  }
+
+  // 从桌面快捷方式打开时仍是普通标签页：点一下画面进入全屏，隐藏地址栏，留更多面积给画面
+  document.querySelector(".stage").addEventListener("click", function () {
+    var d = document.documentElement;
+    if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({ navigationUI: "hide" }).catch(function () {});
+  });
+
+  el.phoneNameSave.addEventListener("click", function () {
+    var v = el.phoneName.value.trim().slice(0, 16);
+    if (!v) { toast("名称不能为空"); return; }
+    phoneName = v; lsSet(PHONE_NAME_KEY, phoneName);
+    toast("本机名称：" + phoneName);
+    el.phoneName.blur();
+  });
+  el.torchBtn.addEventListener("click", function () {
+    setLightMode(lightMode === "off" ? "auto" : lightMode === "auto" ? "on" : "off");
+  });
+  el.lseg.addEventListener("click", function (e) {
+    var m = e.target.dataset && e.target.dataset.l;
+    if (m && m !== lightMode) setLightMode(m);
+  });
+  el.flip.addEventListener("click", function () { selectFacing(facing === "user" ? "environment" : "user"); });
+  el.more.addEventListener("click", function () { openSheet(true); });
+  el.mask.addEventListener("click", function () { openSheet(false); });
+  el.camFront.addEventListener("click", function () { selectFacing("user"); });
+  el.camBack.addEventListener("click", function () { selectFacing("environment"); });
+  el.qseg.addEventListener("click", function (e) {
+    var q = e.target.dataset && e.target.dataset.q;
+    if (!q || q === quality) return;
+    quality = q; lsSet(QUALITY_KEY, q); syncUI(); toast("画质 " + QUALITY[q].label); restartCamera();
+  });
+  el.gridT.addEventListener("change", function () { lsSet(GRID_KEY, el.gridT.checked ? "1" : "0"); syncUI(); });
+  el.mirror.addEventListener("change", syncUI);
+
+  document.addEventListener("visibilitychange", async function () {
+    if (document.visibilityState === "hidden") { if (rawStream || running) stopCamera(); }
+    else {
+      await new Promise(function (r) { setTimeout(r, 500); });
+      if (document.visibilityState === "visible" && !rawStream) startCamera();
+      keepAwake();
+    }
+  });
+  window.addEventListener("beforeunload", stopCamera);
+
+  async function loadConfig() {
+    try { cfg = await (await fetch("/config.json", { cache: "no-store" })).json(); } catch (e) { cfg = null; }
+    if (cfg && cfg.caSha256) lsSet("t9cam.ca", cfg.caSha256);   // 记住电脑的身份：电脑换了地址时靠它认出来
+    el.note.textContent = cfg && cfg.lanIp && cfg.lanIp !== "127.0.0.1"
+      ? "通过局域网连接电脑 " + cfg.lanIp
+      : "未取到电脑的局域网地址";
+  }
+
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) { el.offline.textContent = "离线缓存：不支持"; return; }
+    navigator.serviceWorker.register("sw.js").then(function () {
+      el.offline.textContent = "离线缓存已就绪 · 拔线后刷新仍可打开";
+    }).catch(function (e) { el.offline.textContent = "离线缓存未启用：" + e.message; });
+  }
+
+  window.addEventListener("load", async function () {
+    el.mirror.checked = facing === "user";
+    el.gridT.checked = lsGet(GRID_KEY) === "1";
+    syncUI();
+    await loadConfig();
+    registerSW();
+    if (document.visibilityState === "visible") startCamera();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{
+  "manifest_version": "0.2",
+  "name": "open-your-eyes",
+  "display_name": "Open Your Eyes",
+  "version": "0.7.4",
+  "description": "把闲置手机当作 Claude 的眼睛：需要时让工作台上的手机拍照，全部在本机与局域网内完成。",
+  "long_description": "需要先在电脑上安装并打开 Open Your Eyes 程序，手机扫码加入后即可使用。每次拍照都要你在 Claude 里允许；照片不经过任何云服务。",
+  "icon": "icon.png",
+  "author": {
+    "name": "ai-shushu",
+    "url": "https://github.com/ai-shushu"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ai-shushu/openyoureyes"
+  },
+  "homepage": "https://github.com/ai-shushu/openyoureyes",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "look",
+      "description": "用工作台上的手机拍现实中的东西（电路板、接线、零件、仪器读数、另一台设备的屏幕等），按机位返回照片和拍摄角度"
+    },
+    {
+      "name": "zoom",
+      "description": "放大本对话最近一次 look 照片的某个区域"
+    },
+    {
+      "name": "look_clip",
+      "description": "用工作台上的手机在一段时间内连拍几帧，看现实中正在变化的东西（指示灯闪烁、屏幕刷新、零件运动）"
+    },
+    {
+      "name": "eyes_status",
+      "description": "各台手机（机位）是否在线、拍照页是否在前台"
+    }
+  ],
+  "keywords": [
+    "camera",
+    "phone",
+    "vision",
+    "local"
+  ],
+  "license": "UNLICENSED",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

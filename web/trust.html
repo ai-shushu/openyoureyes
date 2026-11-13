@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+<title>连接这台电脑 · Open Your Eyes</title>
+<style>
+:root { color-scheme: light dark; --bg:#f4f6f9; --fg:#14181d; --mut:#5d6773; --card:#fff; --line:#e3e7ec;
+  --acc:#1f6feb; --accbg:#e8f0fe; --ok:#1a8f4c; --okbg:#e6f6ec; --key:#d4351c; --keybg:#fdecea; --warn:#a96300; --warnbg:#fff4e0; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0d1116; --fg:#e8edf2; --mut:#8b97a5; --card:#151b23; --line:#263140;
+  --acc:#5b9dff; --accbg:#16243b; --ok:#35c46a; --okbg:#12261a; --key:#ff6b5b; --keybg:#331713; --warn:#e0a458; --warnbg:#2c2112; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 -apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif; }
+main { max-width:560px; margin:0 auto; padding:calc(env(safe-area-inset-top) + 18px) 14px 40px; }
+h1 { font-size:22px; margin:0 0 4px; }
+.lead { color:var(--mut); font-size:14px; margin:0 0 14px; }
+
+/* 顶部状态：自动检测是否已信任 */
+.status { border-radius:14px; padding:13px 15px; margin-bottom:14px; font-size:15px; display:flex; gap:10px; align-items:center; }
+.status.wait { background:var(--warnbg); color:var(--warn); }
+.status.ok { background:var(--okbg); color:var(--ok); font-weight:600; }
+.status .spin { width:16px; height:16px; border-radius:50%; border:2px solid currentColor; border-right-color:transparent; flex:none; animation:r 1s linear infinite; }
+@keyframes r { to { transform:rotate(360deg); } }
+
+.alert { background:var(--keybg); color:var(--key); border-radius:14px; padding:13px 15px; margin-bottom:14px; font-size:15px; display:none; }
+.alert.on { display:block; }
+
+.tabs { display:flex; gap:6px; margin-bottom:12px; }
+.tabs button { flex:1; font:inherit; font-size:14px; padding:8px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--mut); }
+.tabs button.on { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+
+.step { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 15px 12px 52px; margin-bottom:10px; position:relative; }
+.step .n { position:absolute; left:14px; top:14px; width:26px; height:26px; border-radius:50%; background:var(--acc); color:#fff;
+  font-size:14px; font-weight:700; display:grid; place-items:center; }
+.step h2 { font-size:16px; margin:0 0 6px; }
+.step ol { margin:0; padding-left:18px; font-size:15px; }
+.step li { margin:3px 0; }
+.step.key { border:2px solid var(--key); background:var(--keybg); }
+.step.key .n { background:var(--key); }
+/* 模拟 iPhone 设置界面的一小块：让用户知道要找的东西长什么样 */
+.mock { margin:8px 0 4px; max-width:300px; background:#f2f2f7; border-radius:12px; padding:6px; font-size:14px; color:#000; }
+.mock .row { background:#fff; border-radius:9px; padding:9px 12px; display:flex; align-items:center; gap:8px; }
+.mock .row + .row { margin-top:5px; }
+.mock .row .g { color:#8e8e93; margin-left:auto; }
+.mock .row.hl { box-shadow:0 0 0 2px #ff3b30; }
+.mock .sw { margin-left:auto; width:44px; height:26px; border-radius:13px; background:#34c759; position:relative; flex:none; }
+.mock .sw::after { content:""; position:absolute; right:2px; top:2px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); }
+.mock .cap { font-size:11.5px; color:#6d6d72; padding:2px 8px 4px; }
+.faq { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:10px 15px; margin-bottom:10px; font-size:14px; }
+.faq summary { font-weight:600; cursor:pointer; }
+.faq ul { margin:6px 0 2px; padding-left:18px; color:var(--mut); }
+.step.key h2 { color:var(--key); }
+.step.done { opacity:.55; }
+.step.done .n { background:var(--ok); }
+
+/* 视觉重点：蓝色 = 要点的按钮/菜单名；红色 = 最容易漏的关键操作；绿色 = 成功 */
+.ui { color:var(--acc); background:var(--accbg); font-weight:600; padding:0 5px; border-radius:5px; white-space:nowrap; }
+.k { color:var(--key); font-weight:700; }
+.path { display:block; margin:6px 0 2px; font-size:14px; font-weight:600; color:var(--acc); background:var(--accbg); border-radius:8px; padding:6px 9px; }
+.tip { font-size:13px; color:var(--mut); margin-top:6px; }
+
+.btn { display:block; width:100%; text-align:center; font:inherit; font-size:16px; font-weight:600; text-decoration:none; border:0;
+  padding:13px; border-radius:12px; margin:10px 0 2px; background:var(--acc); color:#fff; }
+.btn.ghost { background:var(--card); color:var(--acc); border:1px solid var(--line); font-weight:500; }
+.btn.go { background:var(--ok); }
+.appcard { background:var(--okbg); border:2px solid var(--ok); border-radius:14px; padding:14px 15px; margin-bottom:12px; display:none; }
+.appcard.on { display:block; }
+.appcard h2 { font-size:17px; margin:0 0 4px; color:var(--ok); }
+.appcard p { margin:0 0 6px; font-size:14px; }
+.appcard ol { margin:6px 0 0; padding-left:18px; font-size:14px; }
+.or { text-align:center; color:var(--mut); font-size:13px; margin:4px 0 12px; display:none; text-decoration:underline; }
+.or.on { display:block; }
+.legend { font-size:12px; color:var(--mut); margin:14px 2px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>连接这台电脑</h1>
+  <p class="lead" id="lead">网页要用摄像头，手机要求必须是加密连接，所以第一次要让手机「认识」你的电脑。只做一次，全程只在你家 Wi-Fi 里，不经过任何服务器。</p>
+
+  <div class="status wait" id="status"><span class="spin"></span><span id="statusText">正在检测这台手机是否已信任电脑…</span></div>
+
+  <div class="alert" id="notSafari">
+    <b id="nbTitle">请改用 Safari 打开这个页面</b><br><span id="nbText">iPhone 只有 Safari 能安装证书。点下面按钮复制链接，打开 Safari 粘贴到地址栏。</span>
+    <button class="btn" id="copy">复制链接</button>
+  </div>
+
+  <!-- 安卓：推荐装 App（可选）。不用装证书、熄屏也能待命、重启后自动连回 -->
+  <div class="appcard" id="appCard">
+    <h2>推荐：安装 Open Your Eyes App</h2>
+    <p>不用装证书，熄屏也能待命，手机重启后自动连回电脑。安装包直接从你的电脑下载（<span id="appSize"></span>）。</p>
+    <a class="btn go" id="appDl" href="/app/openyoureyes.apk">① 下载并安装 App</a>
+    <ol><li>提示下载、安装时点 <span class="ui">下载</span> <span class="ui">安装</span>；提示「未知来源」或「非应用商店」时，按提示允许这一次</li></ol>
+    <a class="btn" id="appGo" href="#">② 装好后点这里：用 App 连接</a>
+    <ol><li>弹出「打开 Open Your Eyes？」时点 <span class="ui">打开</span>，App 里问摄像头权限时点 <span class="ui">允许</span></li>
+      <li>点「打开」后没跳过去？<b>再点一次</b>（有的浏览器第一次只是记下授权）</li>
+      <li>还是不行？直接打开桌面上的 <b>Open Your Eyes</b>，点 <span class="ui">在局域网里查找电脑</span>，再到电脑上点这台手机下面的 <span class="ui">允许</span></li></ol>
+  </div>
+  <a class="or" id="appOr" href="#">不想装 App？改用网页（要在手机上装一次证书）▾</a>
+
+  <div class="tabs"><button id="tabIos">iPhone / iPad</button><button id="tabAnd">安卓</button></div>
+
+  <!-- ===================== iPhone ===================== -->
+  <section id="ios">
+    <div class="step" id="s1">
+      <span class="n">1</span>
+      <h2>下载证书</h2>
+      <a class="btn" href="/ca.crt" id="dl1">下载证书</a>
+      <ol><li>弹窗里点 <span class="ui">允许</span>，再点 <span class="ui">关闭</span></li></ol>
+    </div>
+
+    <div class="step">
+      <span class="n">2</span>
+      <h2>安装证书</h2>
+      <ol>
+        <li>回到桌面，打开 <span class="ui">设置</span> App</li>
+        <li>点最上面的 <span class="ui">已下载描述文件</span>
+          <div class="mock"><div class="row">👤 你的名字 <span class="g">›</span></div><div class="row hl">已下载描述文件 <span class="g">›</span></div></div>
+          <div class="tip">没看到？进入 <span class="ui">通用</span> → <span class="ui">VPN 与设备管理</span>，点里面的「<span class="caName">Open Your Eyes LAN CA</span>」</div></li>
+        <li>点右上角 <span class="ui">安装</span>，输入锁屏密码，再点 <span class="ui">安装</span> → <span class="ui">完成</span></li>
+      </ol>
+    </div>
+
+    <div class="step key">
+      <span class="n">3</span>
+      <h2>⚠️ 打开信任开关（最容易漏的一步）</h2>
+      <ol>
+        <li>还在 <span class="ui">设置</span> 里，依次进入：
+          <span class="path">通用 → 关于本机 → 拉到最底 → 证书信任设置</span></li>
+        <li>找到 <b class="caName">Open Your Eyes LAN CA</b>，<span class="k">把开关打开（变绿）</span>
+          <div class="mock"><div class="cap">针对根证书启用完全信任</div><div class="row hl"><span class="caName">Open Your Eyes LAN CA</span><span class="sw"></span></div></div></li>
+        <li>弹窗里点 <span class="ui">继续</span></li>
+      </ol>
+      <div class="tip">只做了第 2 步、没打开这个开关，手机仍然连不上电脑。</div>
+    </div>
+
+    <div class="step">
+      <span class="n">4</span>
+      <h2>回到 Safari</h2>
+      <ol><li>回到这个页面，<b style="color:var(--ok)">会自动检测，成功后自动打开拍照页</b></li></ol>
+    </div>
+
+    <details class="faq">
+      <summary>做完了还是连不上？</summary>
+      <ul>
+        <li>「证书信任设置」里没有这一项：第 2 步没装完，回到 <b>设置 → 通用 → VPN 与设备管理</b> 看看是否已安装。</li>
+        <li>装过旧的证书：在「VPN 与设备管理」里把旧的 Open Your Eyes / T9 Eyes 证书删掉，再从第 1 步做一遍。</li>
+        <li>点「下载证书」没反应：确认用的是 <b>Safari</b>（微信、Chrome 里装不了）。</li>
+        <li>手机和电脑要连<b>同一个 Wi-Fi</b>；公司、酒店的 Wi-Fi 有时禁止设备互相访问，可以换手机热点试试。</li>
+      </ul>
+    </details>
+  </section>
+
+  <!-- ===================== 安卓 ===================== -->
+  <section id="and">
+    <div class="step">
+      <span class="n">1</span>
+      <h2>下载证书</h2>
+      <a class="btn" href="/ca.crt" id="dl2">下载证书</a>
+      <ol><li>浏览器提示下载时点 <span class="ui">下载</span>（文件名 OpenYourEyes-CA.crt）</li></ol>
+    </div>
+
+    <div class="step key">
+      <span class="n">2</span>
+      <h2>⚠️ 安装为「CA 证书」</h2>
+      <ol>
+        <li>打开手机 <span class="ui">设置</span>，在顶部搜索框搜 <span class="ui">CA 证书</span>（搜不到就搜「证书」）</li>
+        <li>点 <span class="ui">安装证书</span> 或 <span class="ui">从存储设备安装</span></li>
+        <li>类型选 <span class="k">CA 证书</span>（不要选「VPN 和应用」或「WLAN」），提示风险时点 <span class="ui">仍然安装</span></li>
+        <li>在「下载」里选 <b>OpenYourEyes-CA.crt</b></li>
+      </ol>
+      <div class="tip">各品牌菜单名称略有不同；系统要求先设置锁屏密码时，按提示设置即可。</div>
+    </div>
+
+    <div class="step">
+      <span class="n">3</span>
+      <h2>回到浏览器</h2>
+      <ol><li>回到这个页面，<b style="color:var(--ok)">会自动检测，成功后自动打开拍照页</b></li></ol>
+    </div>
+  </section>
+
+  <!-- ===================== 不认手机证书、但允许「继续浏览」的浏览器（实测：vivo 浏览器） ===================== -->
+  <section id="proceed" style="display:none">
+    <div class="step">
+      <span class="n">1</span>
+      <h2>打开拍照页</h2>
+      <a class="btn" id="goProceed" href="#">打开拍照页</a>
+      <div class="tip"><span class="pbName">这个浏览器</span>不用安装证书，直接按这两步操作。</div>
+    </div>
+    <div class="step key">
+      <span class="n">2</span>
+      <h2>⚠️ 出现安全提示时点「<span class="pbBtn">继续浏览</span>」</h2>
+      <ol>
+        <li>会弹出 <b>「网站安全证书来自未知授权中心」</b></li>
+        <li>确认上面网址是 <b class="pbHost"></b>（就是你这台电脑），<span class="k">点 <span class="ui pbBtn">继续浏览</span></span></li>
+        <li>询问能否使用摄像头时，点 <span class="ui">允许</span></li>
+      </ol>
+      <div class="tip">证书是你自己的电脑生成的，可以放心继续。浏览器会记住，以后不用再点；电脑换了网络后如果又出现，同样点继续。
+        <b>别的网站出现这个提示时不要点继续。</b></div>
+    </div>
+  </section>
+
+  <a class="btn go" id="go" href="#" style="display:none">打开拍照页</a>
+  <button class="btn ghost" id="check">我已完成，再检测一次</button>
+  <p class="legend"><span class="ui">蓝色</span> 是要点的按钮或菜单　<span class="k">红色</span> 是最容易漏的关键操作</p>
+</main>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ua = navigator.userAgent;
+  var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var isAndroid = /Android/.test(ua);
+  var cfg = { httpsPort: 39758 };
+  var host = location.hostname;
+  // 二维码里带着配对密钥（#k=…，不会发给服务器日志），一路带到拍照页，扫码的手机自动通过
+  var pairKey = (/[#&]k=([\w-]+)/.exec(location.hash) || [])[1] || "";
+  function phoneBase() { return "https://" + host + ":" + cfg.httpsPort + "/"; }
+  function phoneUrl() { return phoneBase() + (pairKey ? "#k=" + pairKey : ""); }
+
+  // 实测：这些浏览器不认手机里装的证书，但摄像头可用，点一次「继续」后会记住 → 走「直接打开 + 点继续」
+  var PROCEED = [
+    { re: /VivoBrowser/i, name: "vivo 浏览器", btn: "继续浏览" }
+  ];
+  var pb = isAndroid && PROCEED.filter(function (b) { return b.re.test(ua); })[0];
+
+  // iPhone 上只有 Safari 能装描述文件：微信、Chrome、Firefox 等内置浏览器要提示换 Safari
+  if (isIOS && /CriOS|FxiOS|EdgiOS|MicroMessenger|QQ\/|Weibo|DingTalk/i.test(ua)) $("notSafari").classList.add("on");
+  // 安卓：扫码 App、微信、QQ 等的内置浏览器（WebView）一般不给网页用摄像头，拍照页会显示「摄像头不可用」
+  if (isAndroid && /; wv\)|MicroMessenger|QQ\/|MQQBrowser|Weibo|DingTalk|AlipayClient|baiduboxapp/i.test(ua)) {
+    $("nbTitle").textContent = "请改用 Chrome 浏览器打开这个页面";
+    $("nbText").textContent = /MicroMessenger|QQ\/|Weibo|DingTalk|AlipayClient|baiduboxapp/i.test(ua)
+      ? "现在是在其它应用的内置浏览器里，它不让网页使用摄像头。点右上角「⋯」选「在浏览器中打开」，或点下面按钮复制链接，打开 Chrome 粘贴到地址栏。"
+      : "这个浏览器不让网页使用摄像头，也不认手机里装的证书（很多手机自带的浏览器都这样）。点下面按钮复制链接，用 Chrome 打开；没有 Chrome 就在应用商店搜索「Chrome」安装。";
+    $("copy").textContent = "复制链接";
+    $("notSafari").classList.add("on");
+  }
+  $("copy").addEventListener("click", function () {
+    var t = location.href;
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () {
+      $("copy").textContent = isAndroid ? "已复制，去 Chrome 粘贴打开" : "已复制，去 Safari 粘贴打开";
+    }).catch(function () { prompt("长按复制这个链接，到" + (isAndroid ? " Chrome " : " Safari ") + "打开：", t); });
+  });
+
+  function show(which) {
+    $("ios").style.display = which === "ios" ? "" : "none";
+    $("and").style.display = which === "and" ? "" : "none";
+    $("tabIos").classList.toggle("on", which === "ios");
+    $("tabAnd").classList.toggle("on", which === "and");
+  }
+  $("tabIos").addEventListener("click", function () { show("ios"); });
+  $("tabAnd").addEventListener("click", function () { show("and"); });
+  show(isAndroid ? "and" : "ios");
+  if (isIOS || isAndroid) document.querySelector(".tabs").style.display = "none";   // 已经知道是哪种手机，不用让用户选
+  var appMode = false, webOpen = false;
+  function useAppMode() {   // 安卓且电脑带着 App：只突出 App 这条路，网页那条收起来
+    appMode = true;
+    $("and").style.display = "none"; $("check").style.display = "none"; $("proceed").style.display = "none";
+    $("lead").style.display = "none"; $("status").style.display = "none";   // 绿色卡片里已经说清楚了
+  }
+  $("appOr").addEventListener("click", function (e) {
+    e.preventDefault();
+    webOpen = !webOpen;
+    $("status").style.display = webOpen ? "" : "none";
+    if (pb) $("proceed").style.display = webOpen ? "" : "none";   // 这个浏览器网页方式不用装证书，点「继续」即可
+    else { $("and").style.display = webOpen ? "" : "none"; $("check").style.display = webOpen ? "" : "none"; }
+    $("appOr").textContent = webOpen ? "收起网页方式 ▴" : (pb ? "不想装 App？改用网页 ▾" : "不想装 App？改用网页（要在手机上装一次证书）▾");
+    if (webOpen) check();
+  });
+  if (pb) {
+    document.querySelector(".tabs").style.display = "none";
+    $("and").style.display = "none";
+    $("check").style.display = "none";
+    $("proceed").style.display = "";
+    Array.prototype.forEach.call(document.querySelectorAll(".pbName"), function (e) { e.textContent = pb.name; });
+    Array.prototype.forEach.call(document.querySelectorAll(".pbBtn"), function (e) { e.textContent = pb.btn; });
+    Array.prototype.forEach.call(document.querySelectorAll(".pbHost"), function (e) { e.textContent = host; });
+  }
+
+  // 下载过的步骤变淡，提醒往下做
+  ["dl1", "dl2"].forEach(function (id) {
+    $(id).addEventListener("click", function () { $(id).closest(".step").classList.add("done"); });
+  });
+
+  var trusted = false, timer = 0;
+  function setStatus(ok, text) {
+    $("status").className = "status " + (ok ? "ok" : "wait");
+    $("status").innerHTML = (ok ? "✓ " : "<span class='spin'></span>") + "<span>" + text + "</span>";
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var wasOk = lsGet("t9.trusted") === "1";   // 这台手机以前连上过
+  function success() {
+    if (trusted) return;
+    trusted = true;
+    lsSet("t9.trusted", "1");
+    if (wasOk) {   // 以前连过：直接进拍照页，不再展示教程
+      setStatus(true, "正在打开拍照页…");
+      location.replace(phoneUrl());
+      return;
+    }
+    setStatus(true, "这台手机已信任电脑，正在打开拍照页…");
+    $("go").href = phoneUrl(); $("go").style.display = "block";
+    clearInterval(timer);
+    if ($("appCard").classList.contains("on")) {   // 安卓可以选 App：不自动跳走，让用户自己选
+      setStatus(true, "这台手机已信任电脑：可以装 App，也可以点最下面「打开拍照页」直接用网页");
+      return;
+    }
+    setTimeout(function () { location.href = phoneUrl(); }, 1500);
+  }
+  // 检测：直接去连电脑的加密地址。证书没被信任时浏览器会拒绝连接（请求失败），信任了就能连上。
+  async function check(manual) {
+    if (trusted) return;
+    if (location.protocol === "https:" && window.isSecureContext) { success(); return; }
+    try {
+      await fetch(phoneBase() + "config.json?t=" + Date.now(), { mode: "no-cors", cache: "no-store" });
+      success();
+    } catch (e) {
+      if (appMode && !webOpen) return;   // 装 App 不需要证书：不显示「还没信任」
+      if (pb) {
+        $("status").className = "status wait";
+        $("status").innerHTML = "<span>用" + pb.name + "：不用装证书，按下面两步打开拍照页</span>";
+        $("goProceed").href = phoneUrl();
+        return;
+      }
+      setStatus(false, manual ? "还没信任成功：请对照下面的步骤检查，尤其是红框那一步"
+        : wasOk ? "这台手机现在连不上电脑：电脑的安全证书更新过，需要按下面的步骤重新信任一次（约 1 分钟）"
+        : "还没信任：按下面的步骤操作，做完回到这里会自动检测");
+    }
+  }
+
+  fetch("/config.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+    if (j.httpsPort) cfg.httpsPort = j.httpsPort;
+    if (isAndroid && j.app && j.caSha256) {   // 电脑端带着安卓 App：给出「装 App」这条路
+      $("appCard").classList.add("on"); $("appOr").classList.add("on");
+      useAppMode();
+      $("appSize").textContent = Math.max(1, Math.round(j.app.size / 1024)) + " KB";
+      $("appGo").href = "openyoureyes://pair?h=" + encodeURIComponent(host) + "&hp=" + (location.port || 80) + "&p=" + cfg.httpsPort +
+        "&k=" + encodeURIComponent(pairKey) + "&fp=" + j.caSha256;
+    }
+    if (j.caName) Array.prototype.forEach.call(document.querySelectorAll(".caName"), function (b) { b.textContent = j.caName; });
+  }).catch(function () {}).then(function () {
+    check();
+    timer = setInterval(check, 2500);
+  });
+  // 从「设置」切回来时立刻检测一次
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") check(); });
+  $("check").addEventListener("click", function () { check(true); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "name": "open-your-eyes",
+  "version": "0.7.4",
+  "description": "把闲置手机当作 Claude 的眼睛：Claude 请求时，工作台上的手机（可多台同时）立即拍照并交回，全部在本机与局域网内完成。",
+  "author": {
+    "name": "ai-shushu",
+    "url": "https://github.com/ai-shushu"
+  },
+  "repository": "https://github.com/ai-shushu/openyoureyes",
+  "homepage": "https://github.com/ai-shushu/openyoureyes",
+  "keywords": [
+    "camera",
+    "phone",
+    "vision",
+    "hardware",
+    "local"
+  ]
+}

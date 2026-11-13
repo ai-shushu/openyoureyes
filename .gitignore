@@ -1,0 +1,32 @@
+# 用户隐私数据：照片、日志
+snaps/
+server/logs/
+
+# 证书与私钥（每台电脑本地生成，绝不入库）
+server/certs/
+
+# 本地工具与模型（不入库）
+tools/
+
+# 其它工具的本地笔记
+.workbuddy/
+
+# 本机个人 Claude 设置
+.claude/settings.local.json
+
+# Python / 系统杂项
+__pycache__/
+*.pyc
+.DS_Store
+
+# 项目虚拟环境
+.venv/
+
+# 打包产物
+dist/
+build/
+
+# 安卓 App 编译产物（由 dev/build_android.py 生成）
+web/app/
+.venv-universal/
+build-universal/
