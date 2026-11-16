@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>取景 · Open Your Eyes</title>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<style>
+:root { color-scheme: dark; --bg:#141311; --card:#1f1d1a; --line:#34312c; --fg:#f3f1ec; --mut:#a39e94; --acc:#d06e4f; --ok:#3cb371; }
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:14px/1.5 -apple-system,"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif;
+  -webkit-user-select:none; user-select:none; overflow:hidden; }
+.app { height:100%; display:flex; flex-direction:column; padding:14px 16px 16px; gap:12px; }
+.head { display:flex; align-items:flex-start; gap:10px; }
+.head img { width:26px; height:26px; flex:none; margin-top:1px; }
+.head .t { font-size:16px; font-weight:650; line-height:1.4; word-break:break-all; }
+.head .s { color:var(--mut); font-size:12.5px; }
+.grid { flex:1; min-height:0; display:grid; gap:10px; }
+.grid.n1 { grid-template-columns:1fr; } .grid.n2 { grid-template-columns:1fr 1fr; } .grid.n3, .grid.n4 { grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+.tile { position:relative; background:#000; border-radius:12px; overflow:hidden; min-height:0; cursor:pointer; outline:2px solid transparent; transition:opacity .15s; }
+.tile.multi:hover { outline-color:var(--line); }
+.tile video, .tile img { position:absolute; left:50%; top:50%; width:100%; height:100%; object-fit:contain; transform:translate(-50%,-50%); }
+.tile .lb { position:absolute; left:8px; top:8px; z-index:2; background:rgba(0,0,0,.6); border-radius:7px; padding:2px 8px; font-size:12.5px; display:flex; gap:6px; align-items:center; }
+.tile .lb i { width:7px; height:7px; border-radius:50%; background:#777; }
+.tile.on .lb i { background:var(--ok); }
+.tile .msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--mut); font-size:13px; text-align:center; padding:12px; }
+.tile.off { opacity:.35; }
+.tile .x { position:absolute; right:8px; top:8px; z-index:2; background:rgba(0,0,0,.6); border-radius:7px; padding:2px 8px; font-size:12px; color:var(--mut); display:none; }
+.tile.multi .x { display:block; }
+.foot { display:flex; align-items:center; gap:10px; }
+.foot .hint { color:var(--mut); font-size:12px; flex:1; }
+button { font:inherit; border:0; border-radius:10px; padding:10px 18px; cursor:pointer; }
+#cancel { background:var(--card); color:var(--fg); border:1px solid var(--line); }
+#shoot { background:var(--acc); color:#fff; font-weight:650; padding:10px 26px; }
+button:disabled { opacity:.5; cursor:default; }
+kbd { font:inherit; font-size:11px; opacity:.75; margin-left:6px; }
+.done { position:fixed; inset:0; display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px; background:rgba(20,19,17,.92); z-index:9; font-size:16px; }
+.done.on { display:flex; }
+.done b { font-size:30px; color:var(--ok); }
+.done.bad b { color:var(--acc); }
+.tile canvas { position:absolute; left:50%; top:50%; max-width:100%; max-height:100%; transform:translate(-50%,-50%); }
+.shooting { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:3; background:rgba(208,110,79,.92); color:#fff;
+  border-radius:9px; padding:5px 14px; font-size:13.5px; font-weight:600; white-space:nowrap; }
+.shooting.ok { background:rgba(60,179,113,.92); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="head">
+    <img src="/icon.svg" alt="">
+    <div><div class="t" id="what">等待 AI 的拍照请求…</div><div class="s" id="sub"></div></div>
+  </div>
+  <div class="grid n1" id="grid"></div>
+  <div class="foot">
+    <div class="hint" id="hint">摆好东西、调好角度后按快门</div>
+    <button id="cancel">取消<kbd>Esc</kbd></button>
+    <button id="shoot">拍照<kbd>回车</kbd></button>
+  </div>
+</div>
+<div class="done" id="done"><b>✓</b><span id="doneTxt">已拍好，交给 AI</span></div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  async function api(path, body) {
+    var r = await fetch(path, body === undefined ? { cache: "no-store" } :
+      { method: "POST", headers: { "Content-Type": "application/json", "X-T9": "1" }, body: JSON.stringify(body) });
+    return r.json();
+  }
+  var inApp = function () { return window.pywebview && window.pywebview.api; };
+  var cur = null, tiles = {}, busy = false, leftAt = 0;
+
+  // ---------- 实时画面（和设置页的实时取景同一套：App 是一帧帧 JPEG，网页拍照页是实时视频） ----------
+  function iceDone(pc, ms) {
+    return new Promise(function (r) {
+      if (pc.iceGatheringState === "complete") return r();
+      var to = setTimeout(r, ms);
+      pc.addEventListener("icegatheringstatechange", function () { if (pc.iceGatheringState === "complete") { clearTimeout(to); r(); } });
+    });
+  }
+  function fitVideo(v) {
+    var box = v.parentNode, rot = v.videoWidth > v.videoHeight && box.clientHeight > box.clientWidth;
+    v.style.width = rot ? box.clientHeight + "px" : "100%";
+    v.style.height = rot ? box.clientWidth + "px" : "100%";
+    v.style.transform = "translate(-50%,-50%)" + (rot ? " rotate(90deg)" : "");
+  }
+  async function liveStart(ph, q) {
+    var t = tiles[ph.id], msg = t.el.querySelector(".msg");
+    if (!ph.online) { msg.textContent = "这台手机现在不在线"; return; }
+    msg.textContent = "正在打开画面…";
+    try {
+      var j = await api("/api/live/start", { phone: ph.id, q: q });
+      if (!j.ok) throw new Error(j.error || "打不开");
+      t.sid = j.sid;
+      if (ph.app) {
+        var img = document.createElement("img"); img.alt = "";
+        img.onload = function () { msg.textContent = ""; t.el.classList.add("on"); };
+        img.src = "/api/live/mjpeg?sid=" + t.sid;
+        t.el.appendChild(img); t.media = img;
+        var mbeat = async function () {
+          if (tiles[ph.id] !== t) return;
+          try { var k = await api("/api/live/ping", { sid: t.sid, q: q }); if (k.state === "ended" && !t.frozen) msg.textContent = "画面断开了"; } catch (e) {}
+          t.beat = setTimeout(mbeat, 2500);
+        };
+        mbeat();
+        return;
+      }
+      var v = document.createElement("video"); v.autoplay = true; v.muted = true; v.playsInline = true;
+      v.addEventListener("loadedmetadata", function () { fitVideo(v); msg.textContent = ""; t.el.classList.add("on"); });
+      v.addEventListener("resize", function () { fitVideo(v); });
+      t.el.appendChild(v); t.media = v;
+      var pc = t.pc = new RTCPeerConnection({ iceServers: [] });
+      pc.ontrack = function (ev) { v.srcObject = ev.streams[0] || new MediaStream([ev.track]); };
+      var answered = false;
+      var beat = async function () {
+        if (tiles[ph.id] !== t) return;
+        try {
+          var k = await api("/api/live/ping", { sid: t.sid, q: q, wait: answered ? 0 : 2 });   // 还没连上：邀请一到马上拿到
+          if (k.state === "ended") { msg.textContent = "画面断开了"; return; }
+          if (k.offer && !answered) {
+            answered = true;
+            await pc.setRemoteDescription({ type: "offer", sdp: k.offer });
+            await pc.setLocalDescription(await pc.createAnswer());
+            await iceDone(pc, 2500);
+            await api("/api/live/answer", { sid: t.sid, sdp: pc.localDescription.sdp });
+          }
+        } catch (e) { msg.textContent = "画面连接失败"; }
+        t.beat = setTimeout(beat, answered ? 2500 : 100);   // 还没连上：电脑端会等邀请，这里只留一点间隔防出错时空转
+      };
+      beat();
+    } catch (e) { msg.textContent = "打不开画面：" + e.message; }
+  }
+  function liveStop(id) {
+    var t = tiles[id]; if (!t) return;
+    delete tiles[id];
+    clearTimeout(t.beat);
+    try { if (t.pc) t.pc.close(); } catch (e) {}
+    if (t.media) { if (t.media.srcObject) t.media.srcObject = null; t.media.removeAttribute("src"); }
+    if (t.sid) api("/api/live/stop", { sid: t.sid }).catch(function () {});
+  }
+  function clearAll() { Object.keys(tiles).forEach(liveStop); $("grid").innerHTML = ""; }
+  // 按下快门：画面定格在这一刻，不再更新（手机正在拍，别让人以为已经拍完）。
+  // 安卓 App 的实时画面会话先留着（心跳照发）：App 就是在这一路上直接拍的；拍完 clearAll() 再断。
+  function freezeAll() {
+    Object.keys(tiles).forEach(function (id) {
+      var t = tiles[id], m = t.media;
+      t.frozen = true;
+      if (!m || m.tagName !== "IMG") { clearTimeout(t.beat); t.beat = null; }
+      if (!m) return;
+      try {
+        var w = m.videoWidth || m.naturalWidth, h = m.videoHeight || m.naturalHeight;
+        if (w && h) {
+          var c = document.createElement("canvas"); c.width = w; c.height = h;
+          c.getContext("2d").drawImage(m, 0, 0, w, h);
+          if (m.style.transform && m.style.transform.indexOf("rotate") >= 0) { c.style.transform = m.style.transform; c.style.width = m.style.width; c.style.height = m.style.height; c.style.maxWidth = "none"; c.style.maxHeight = "none"; }
+          t.el.appendChild(c);
+        }
+      } catch (e) {}
+      try { if (t.pc) t.pc.close(); } catch (e) {}
+      if (m.srcObject) m.srcObject = null;
+      m.removeAttribute("src"); m.remove(); t.media = null; t.pc = null;
+    });
+  }
+  function badge(id, text, ok) {
+    var t = tiles[id]; if (!t) return;
+    var b = t.el.querySelector(".shooting");
+    if (!b) { b = document.createElement("div"); b.className = "shooting"; t.el.appendChild(b); }
+    b.textContent = text; b.classList.toggle("ok", !!ok);
+  }
+
+  // ---------- 显示一个拍照请求 ----------
+  function show(c, queued) {
+    clearAll();
+    cur = c; busy = false;
+    $("done").classList.remove("on");
+    if (!c) { $("what").textContent = "等待 AI 的拍照请求…"; $("sub").textContent = ""; setButtons(); return; }
+    $("what").textContent = "AI 想看：" + (c.what || "当前画面");
+    var who = c.client ? c.client + " 请求" : "AI 请求";
+    $("sub").textContent = who + (c.kind === "clip" ? "连拍 " + (c.seconds || 2) + " 秒" : "拍照") +
+      " · " + c.phones.map(function (p) { return p.name; }).join("、") + (queued ? " · 后面还有 " + queued + " 个请求在排队" : "");
+    leftAt = Date.now() + (c.leftS || 180) * 1000;
+    var n = c.phones.length, multi = n > 1, q = n === 1 ? "high" : "low";
+    $("grid").className = "grid n" + Math.min(n, 4);
+    c.phones.forEach(function (ph) {
+      var el = document.createElement("div");
+      el.className = "tile" + (multi ? " multi" : "");
+      el.innerHTML = "<div class='lb'><i></i><span></span></div><div class='x'>点一下：这台不拍</div><div class='msg'></div>";
+      el.querySelector(".lb span").textContent = ph.name;
+      el.addEventListener("click", function () {
+        if (!multi) return;
+        var off = !el.classList.contains("off");
+        if (off && $("grid").querySelectorAll(".tile:not(.off)").length <= 1) return;   // 至少留一台
+        el.classList.toggle("off", off);
+        el.querySelector(".x").textContent = off ? "这台不拍 · 点一下恢复" : "点一下：这台不拍";
+        setButtons();
+      });
+      $("grid").appendChild(el);
+      tiles[ph.id] = { el: el };
+      liveStart(ph, q);
+    });
+    setButtons();
+    setTimeout(function () { try { window.focus(); $("shoot").focus(); } catch (e) {} }, 50);
+  }
+  function chosen() {
+    if (!cur) return [];
+    return cur.phones.filter(function (p) { var t = tiles[p.id]; return t && !t.el.classList.contains("off"); }).map(function (p) { return p.id; });
+  }
+  function setButtons() {
+    $("shoot").disabled = !cur || busy; $("cancel").disabled = !cur || busy;
+    var k = chosen().length;
+    $("shoot").firstChild.textContent = cur && cur.phones.length > 1 && k < cur.phones.length ? "拍照（" + k + " 台）" : "拍照";
+  }
+  function hideSoon(ms) {
+    setTimeout(function () {
+      if (cur) return;   // 又来了新的请求，不收起
+      if (inApp() && window.pywebview.api.viewfinder_hide) window.pywebview.api.viewfinder_hide();
+    }, ms);
+  }
+  var shooting = false;
+  async function shoot() {
+    if (!cur || busy) return;
+    busy = true; shooting = true; setButtons();
+    var id = cur.id, keep = chosen(), names = {};
+    cur.phones.forEach(function (p) { names[p.id] = p.name; });
+    freezeAll();
+    keep.forEach(function (pid) { badge(pid, "正在拍照，请保持不动…"); });
+    Object.keys(tiles).forEach(function (pid) { if (keep.indexOf(pid) < 0) tiles[pid].el.classList.add("off"); });
+    $("hint").textContent = "正在拍照：照片拍到之前请不要挪动东西和手机";
+    var j = await api("/api/viewfinder/shoot", { id: id, phones: keep }).catch(function () { return {}; });
+    var r = null, ok = false, text;
+    if (j.ok) {
+      var t0 = Date.now();
+      while (Date.now() - t0 < 65000) {   // 等手机真的拍到（或失败）
+        r = await api("/api/request?id=" + encodeURIComponent(id) + "&wait=3").catch(function () { return null; });
+        if (r && r.shots) r.shots.forEach(function (sh) {
+          if (sh.state === "done") badge(sh.phoneId, "✓ 拍好了", true);
+          else if (sh.state === "failed") badge(sh.phoneId, "✕ 没拍到");
+          else badge(sh.phoneId, "正在拍照，请保持不动…（" + Math.round((Date.now() - t0) / 1000) + " 秒）");
+        });
+        if (r && r.state !== "open") break;
+        if (!r) await new Promise(function (res) { setTimeout(res, 1000); });
+      }
+      var shots = (r && r.shots) || [], good = shots.filter(function (sh) { return sh.state === "done"; });
+      var bad = shots.filter(function (sh) { return sh.state !== "done"; });
+      ok = good.length > 0 && !bad.length;
+      text = ok ? "拍好了，可以挪动东西了" :
+        good.length ? "拍到 " + good.length + " 张；" + bad.map(function (sh) { return sh.phone + " 没拍到" + (sh.error ? "（" + sh.error + "）" : ""); }).join("；") :
+        shots.length ? "没拍到：" + bad.map(function (sh) { return sh.phone + (sh.error ? "（" + sh.error + "）" : ""); }).join("；") : "还没拍到，结果会交给 AI";
+    } else text = j.error || "没能拍照";
+    $("done").classList.toggle("bad", !ok);
+    $("done").querySelector("b").textContent = ok ? "✓" : "!";
+    $("doneTxt").textContent = text;
+    $("done").classList.add("on");
+    clearAll();   // 拍完了：断开实时画面
+    setTimeout(function () { shooting = false; if (cur && cur.id === id) cur = null; hideSoon(0); poll(true); }, ok ? 1000 : 3000);
+  }
+  async function cancel() {
+    if (!cur || busy) return;
+    busy = true; setButtons();
+    var id = cur.id;
+    await api("/api/viewfinder/cancel", { id: id }).catch(function () {});
+    if (cur && cur.id === id) { clearAll(); cur = null; }
+    hideSoon(0); poll(true);
+  }
+  $("shoot").addEventListener("click", shoot);
+  $("cancel").addEventListener("click", cancel);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); shoot(); }
+    else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+  });
+  setInterval(function () {
+    if (!cur || busy) return;
+    var left = Math.max(0, Math.round((leftAt - Date.now()) / 1000));
+    $("hint").textContent = "摆好东西、调好角度后按快门 · " + Math.floor(left / 60) + ":" + ("0" + left % 60).slice(-2) + " 后没按就自动取消";
+  }, 1000);
+
+  // ---------- 跟着电脑程序：取景器该显示哪个请求 ----------
+  var polling = false, again = false;
+  async function poll(now) {
+    if (polling) { again = true; return; }
+    polling = true;
+    try {
+      var j = await api("/api/viewfinder?wait=" + (now ? 0 : 20) + "&have=" + encodeURIComponent(cur ? cur.id : ""));
+      var c = j.current;
+      if (shooting) { /* 正在拍照：保持当前画面，等 shoot() 收尾 */ }
+      else if ((c ? c.id : "") !== (cur ? cur.id : "")) {
+        if (!c && cur) hideSoon(600);
+        show(c, j.queued);
+      } else if (c) {
+        $("sub").textContent = $("sub").textContent.replace(/ · 后面还有 \d+ 个请求在排队$/, "") + (j.queued ? " · 后面还有 " + j.queued + " 个请求在排队" : "");
+      }
+    } catch (e) { await new Promise(function (r) { setTimeout(r, 2000); }); }
+    polling = false;
+    if (again) { again = false; poll(true); } else setTimeout(poll, shooting ? 500 : 50);
+  }
+  window.addEventListener("pagehide", clearAll);
+  poll(true);
+})();
+</script>
+</body>
+</html>

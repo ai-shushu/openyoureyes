@@ -1,0 +1,15 @@
+{
+  "name": "open-your-eyes",
+  "owner": {
+    "name": "ai-shushu",
+    "url": "https://github.com/ai-shushu"
+  },
+  "description": "Open Your Eyes：把闲置手机当作 Claude 的眼睛（本地运行，不依赖任何服务器）",
+  "plugins": [
+    {
+      "name": "open-your-eyes",
+      "source": "./plugin",
+      "description": "把闲置手机当作 Claude 的眼睛：Claude 请求时，手机立即拍照并交回，全部本地运行。"
+    }
+  ]
+}

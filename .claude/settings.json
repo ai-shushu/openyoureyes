@@ -1,0 +1,11 @@
+{
+  "enabledMcpjsonServers": [
+    "open-your-eyes"
+  ],
+  "permissions": {
+    "ask": [
+      "mcp__open-your-eyes__look",
+      "mcp__open-your-eyes__look_clip"
+    ]
+  }
+}

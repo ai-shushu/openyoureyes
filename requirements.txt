@@ -1,0 +1,11 @@
+Pillow
+cryptography>=42
+qrcode>=7.4
+psutil>=5.9
+pystray>=0.19
+pywebview>=5
+# 电脑自己的摄像头（localcam.py）：Mac 用系统自带的 AVFoundation，Windows / Linux 用 OpenCV
+pyobjc-framework-AVFoundation; sys_platform == "darwin"
+pyobjc-framework-CoreMedia; sys_platform == "darwin"
+pyobjc-framework-libdispatch; sys_platform == "darwin"
+opencv-python-headless; sys_platform != "darwin"
